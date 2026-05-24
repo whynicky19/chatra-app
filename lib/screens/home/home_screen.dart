@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/l10n_provider.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/toast.dart';
@@ -40,6 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final l = context.watch<L10n>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surface = Theme.of(context).colorScheme.surface;
 
@@ -47,17 +49,20 @@ class _HomeScreenState extends State<HomeScreen> {
       body: SafeArea(child: RefreshIndicator(color: C.teal, onRefresh: _load, child: CustomScrollView(slivers: [
         // Header
         SliverToBoxAdapter(child: Padding(padding: EdgeInsets.fromLTRB(20, 20, 20, 8), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Classes', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
+          Text(l.t('classes'), style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
           SizedBox(height: 4),
-          Text('Manage your learning and explore new intellectual journeys.', style: TextStyle(fontSize: 13, color: C.text4, fontStyle: FontStyle.italic)),
+          Text(l.t('classes_sub'), style: TextStyle(fontSize: 13, color: C.text4, fontStyle: FontStyle.italic)),
           SizedBox(height: 14),
           Row(children: [
-            OutlinedButton.icon(icon: Icon(Icons.add, size: 16), label: Text('Create Class', style: TextStyle(fontSize: 13)),
-              onPressed: auth.isTeacher ? () => _showCreateClass() : null),
-            SizedBox(width: 10),
-            ElevatedButton(onPressed: _showJoinDialog, style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12)),
-              child: Text('Join by Code', style: TextStyle(fontSize: 13))),
-            Spacer(),
+            if (auth.isTeacher) ...[
+              Expanded(child: OutlinedButton.icon(icon: Icon(Icons.add, size: 16), label: Text(l.t('create_class')),
+                onPressed: () => _showCreateClass(),
+                style: OutlinedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14)))),
+              SizedBox(width: 10),
+            ],
+            Expanded(child: ElevatedButton.icon(icon: Icon(Icons.vpn_key_rounded, size: 16, color: Colors.white), label: Text(l.t('join_code')),
+              onPressed: _showJoinDialog,
+              style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14)))),
           ]),
         ]))),
 
@@ -176,46 +181,58 @@ class _HomeScreenState extends State<HomeScreen> {
   void _showCreateClass() {
     final nameC = TextEditingController(), descC = TextEditingController(), teacherC = TextEditingController(), groupC = TextEditingController(), periodC = TextEditingController();
     String? coverB64;
-    showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: SingleChildScrollView(padding: EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [Text('Создать класс', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)), Spacer(), IconButton(icon: Icon(Icons.close), onPressed: () => Navigator.pop(ctx))]),
-        SizedBox(height: 16),
-        // Cover upload
-        Text('Обложка класса', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: C.teal)),
-        SizedBox(height: 8),
-        GestureDetector(onTap: () async {
-          final picker = ImagePicker();
-          final img = await picker.pickImage(source: ImageSource.gallery, maxWidth: 800, imageQuality: 80);
-          if (img != null) { final bytes = await img.readAsBytes(); setS(() => coverB64 = 'data:image/jpeg;base64,${base64Encode(bytes)}'); }
-        }, child: Container(height: 120, width: double.infinity, decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: C.teal.withOpacity(0.4), style: BorderStyle.none), color: coverB64 != null ? null : C.tealLt),
-          child: coverB64 != null
-            ? ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.memory(base64Decode(coverB64!.split(',').last), fit: BoxFit.cover, width: double.infinity))
-            : Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.image, size: 32, color: C.teal), SizedBox(height: 6), Text('Нажмите для загрузки', style: TextStyle(fontSize: 12, color: C.text4)), Text('JPG, PNG', style: TextStyle(fontSize: 10, color: C.text4))]))),
-        SizedBox(height: 16),
-        _fieldLabel('Название класса *'), TextField(controller: nameC, decoration: InputDecoration(hintText: 'Например: Математика 10А')),
-        SizedBox(height: 12), _fieldLabel('Описание'), TextField(controller: descC, decoration: InputDecoration(hintText: 'Краткое описание курса'), maxLines: 2),
-        SizedBox(height: 12), _fieldLabel('Период'), TextField(controller: periodC, decoration: InputDecoration(hintText: 'Например: 2024-2025')),
-        SizedBox(height: 12), _fieldLabel('Учитель / Преподаватель'), TextField(controller: teacherC, decoration: InputDecoration(hintText: 'Ваше имя')),
-        SizedBox(height: 12), _fieldLabel('Группа'), TextField(controller: groupC, decoration: InputDecoration(hintText: 'Например: ИСУ-21')),
-        SizedBox(height: 20),
-        Row(children: [
-          Expanded(child: TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Отмена'))),
-          SizedBox(width: 12),
-          Expanded(child: ElevatedButton(onPressed: () async {
-            if (nameC.text.trim().isEmpty) return;
-            try {
-              await context.read<ApiService>().createPost(nameC.text.trim(), jsonEncode({
-                'type': 'class', 'description': descC.text.trim(), 'teacher_name': teacherC.text.trim(), 'group': groupC.text.trim(), 'period': periodC.text.trim(),
-                if (coverB64 != null) 'cover_image': coverB64,
-              }));
-              Navigator.pop(ctx); _load(); showToast(context, 'Class created');
-            } catch (_) { showToast(context, 'Error', error: true); }
-          }, child: Text('Создать'))),
-        ]),
-      ])),
-    )));
+    showDialog(context: context, barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        insetPadding: EdgeInsets.all(20),
+        child: Container(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.85),
+          child: Column(children: [
+            // Header
+            Padding(padding: EdgeInsets.fromLTRB(24, 20, 16, 0), child: Row(children: [
+              Text('Создать класс', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+              Spacer(),
+              IconButton(icon: Icon(Icons.close, size: 22), onPressed: () => Navigator.pop(ctx)),
+            ])),
+            Expanded(child: SingleChildScrollView(padding: EdgeInsets.fromLTRB(24, 16, 24, 0), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              // Cover
+              _fieldLabel3('ОБЛОЖКА КЛАССА'),
+              GestureDetector(onTap: () async {
+                final picker = ImagePicker();
+                final img = await picker.pickImage(source: ImageSource.gallery, maxWidth: 800, imageQuality: 80);
+                if (img != null) { final bytes = await img.readAsBytes(); setS(() => coverB64 = 'data:image/jpeg;base64,${base64Encode(bytes)}'); }
+              }, child: Container(height: 160, width: double.infinity,
+                decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: C.teal.withOpacity(0.3), width: 1.5, strokeAlign: BorderSide.strokeAlignCenter), color: coverB64 != null ? null : C.tealLt.withOpacity(0.3)),
+                child: coverB64 != null
+                  ? ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.memory(base64Decode(coverB64!.split(',').last), fit: BoxFit.cover, width: double.infinity))
+                  : Column(mainAxisAlignment: MainAxisAlignment.center, children: [Container(width: 50, height: 50, decoration: BoxDecoration(color: C.teal.withOpacity(0.15), borderRadius: BorderRadius.circular(14)), child: Icon(Icons.image_outlined, size: 26, color: C.teal)), SizedBox(height: 10), Text('Нажмите для загрузки', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: C.teal)), Text('JPG, PNG', style: TextStyle(fontSize: 12, color: C.text4))]))),
+              SizedBox(height: 20),
+              _fieldLabel3('НАЗВАНИЕ КЛАССА *'), TextField(controller: nameC, decoration: InputDecoration(hintText: 'Например: Математика 10А')),
+              SizedBox(height: 16), _fieldLabel3('ОПИСАНИЕ'), TextField(controller: descC, decoration: InputDecoration(hintText: 'Краткое описание курса'), maxLines: 3),
+              SizedBox(height: 16), _fieldLabel3('ПЕРИОД'), TextField(controller: periodC, decoration: InputDecoration(hintText: 'Например: 2024-2025')),
+              SizedBox(height: 16), _fieldLabel3('УЧИТЕЛЬ / ПРЕПОДАВАТЕЛЬ'), TextField(controller: teacherC, decoration: InputDecoration(hintText: 'Ваше имя')),
+              SizedBox(height: 16), _fieldLabel3('ГРУППА'), TextField(controller: groupC, decoration: InputDecoration(hintText: 'Например: ИСУ-21')),
+              SizedBox(height: 24),
+            ]))),
+            // Bottom buttons
+            Padding(padding: EdgeInsets.fromLTRB(24, 8, 24, 20), child: Row(children: [
+              Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(ctx), child: Text('Отмена'), style: OutlinedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14)))),
+              SizedBox(width: 12),
+              Expanded(child: ElevatedButton(onPressed: () async {
+                if (nameC.text.trim().isEmpty) return;
+                try {
+                  await context.read<ApiService>().createPost(nameC.text.trim(), jsonEncode({
+                    'type': 'class', 'description': descC.text.trim(), 'teacher_name': teacherC.text.trim(), 'group': groupC.text.trim(), 'period': periodC.text.trim(),
+                    if (coverB64 != null) 'cover_image': coverB64,
+                  }));
+                  Navigator.pop(ctx); _load(); showToast(context, 'Class created');
+                } catch (_) { showToast(context, 'Error', error: true); }
+              }, child: Text('Создать'), style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14)))),
+            ])),
+          ]),
+        ),
+      )));
   }
 
-  Widget _fieldLabel(String s) => Padding(padding: EdgeInsets.only(bottom: 6), child: Text(s, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: C.teal)));
+  Widget _fieldLabel3(String s) => Padding(padding: EdgeInsets.only(bottom: 8), child: Text(s, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: C.teal, letterSpacing: 1)));
 }

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'services/api_service.dart';
 import 'providers/auth_provider.dart';
 import 'providers/theme_provider.dart';
+import 'providers/l10n_provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
@@ -17,30 +18,26 @@ void main() {
   final api = ApiService(baseUrl: 'http://10.0.2.2:8000');
   final auth = AuthProvider(api);
   final theme = ThemeProvider();
+  final l10n = L10n();
+
+  // Init async before runApp
+  Future.wait([auth.init(), theme.init(), l10n.init()]).then((_) {
+    api.onUnauthorized = () => auth.logout();
+  });
 
   runApp(MultiProvider(
     providers: [
       Provider<ApiService>.value(value: api),
       ChangeNotifierProvider<AuthProvider>.value(value: auth),
       ChangeNotifierProvider<ThemeProvider>.value(value: theme),
+      ChangeNotifierProvider<L10n>.value(value: l10n),
     ],
     child: ChatraApp(),
   ));
 }
 
-class ChatraApp extends StatefulWidget {
+class ChatraApp extends StatelessWidget {
   const ChatraApp({super.key});
-  @override State<ChatraApp> createState() => _ChatraAppState();
-}
-
-class _ChatraAppState extends State<ChatraApp> {
-  @override
-  void initState() {
-    super.initState();
-    context.read<AuthProvider>().init();
-    context.read<ThemeProvider>().init();
-    context.read<ApiService>().onUnauthorized = () => context.read<AuthProvider>().logout();
-  }
 
   @override
   Widget build(BuildContext context) {

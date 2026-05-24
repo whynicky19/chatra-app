@@ -145,35 +145,52 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
       Icon(type == 'lecture' ? Icons.menu_book_rounded : Icons.inventory_2_outlined, size: 48, color: C.teal),
       SizedBox(height: 12), Text(type == 'lecture' ? 'No lectures yet' : 'No materials yet', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: C.text4)),
     ]));
+
+    
+    
+
     return ListView.builder(padding: EdgeInsets.fromLTRB(12, 4, 12, 90), itemCount: posts.length, itemBuilder: (ctx, i) {
       final p = posts[i]; final files = _extractFiles(p);
-      return Container(
-        margin: EdgeInsets.only(bottom: 12), padding: EdgeInsets.all(16),
-        decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(18)),
-        child: Row(children: [
-          Container(width: 48, height: 48,
-            decoration: BoxDecoration(color: C.teal.withOpacity(0.12), borderRadius: BorderRadius.circular(14)),
-            child: Icon(Icons.menu_book_rounded, color: C.teal, size: 22)),
-          SizedBox(width: 14),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(_clean(p['title'] ?? ''), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
-            SizedBox(height: 6),
-            Row(children: [
-              Icon(Icons.calendar_today, size: 12, color: C.text4), SizedBox(width: 4),
-              Text(_fmtDate(p['created_at'] ?? ''), style: TextStyle(fontSize: 12, color: C.text4)),
-              if (files.isNotEmpty) ...[SizedBox(width: 10), Icon(Icons.description_outlined, size: 12, color: C.text4), SizedBox(width: 3), Text('${files.length} file', style: TextStyle(fontSize: 12, color: C.text4))],
-            ]),
-          ])),
-          if (isTeacher) ...[
-            _iconBtn(Icons.edit_outlined, () => _editPost(p)),
-            SizedBox(width: 4),
-            _iconBtn(Icons.delete_outline, () async { try { await context.read<ApiService>().deletePost(p['id']); _load(); } catch (_) {} }),
-            SizedBox(width: 8),
-          ],
-          GestureDetector(onTap: () => _showPost(p, type),
-            child: Text('Open →', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: C.teal))),
+      final body = _preview(p);
+      
+      
+      final num = posts.length - i; final ic = Icons.menu_book_rounded; final icColor = C.teal;
+
+      return GestureDetector(
+        onTap: () => _showPost(p, type),
+        child: Container(
+          margin: EdgeInsets.only(bottom: 14), padding: EdgeInsets.all(18),
+          decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(20)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(width: 50, height: 50, decoration: BoxDecoration(color: icColor.withOpacity(0.12), borderRadius: BorderRadius.circular(16)),
+              child: Icon(ic, color: icColor, size: 24)),
+            SizedBox(width: 14),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('${type == 'lecture' ? 'Lecture' : 'Material'}  $num', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: C.teal)),
+              SizedBox(height: 2),
+              Text(_clean(p['title'] ?? ''), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800), maxLines: 2, overflow: TextOverflow.ellipsis),
+              if (body.isNotEmpty) Padding(padding: EdgeInsets.only(top: 2), child: Text(body, style: TextStyle(fontSize: 13, color: C.text4), maxLines: 1, overflow: TextOverflow.ellipsis)),
+            ])),
+            if (isTeacher) ...[
+              _iconBtn(Icons.edit_outlined, () => _editPost(p)),
+              SizedBox(width: 4),
+              _iconBtn(Icons.delete_outline, () async { try { await context.read<ApiService>().deletePost(p['id']); _load(); } catch (_) {} }),
+            ],
+          ]),
+          SizedBox(height: 10),
+          Row(children: [
+            Icon(Icons.calendar_today, size: 12, color: C.text4), SizedBox(width: 4),
+            Text(_fmtDate(p['created_at'] ?? ''), style: TextStyle(fontSize: 12, color: C.text4)),
+            SizedBox(width: 12),
+            if (files.isNotEmpty) ...[Icon(Icons.description_outlined, size: 12, color: C.text4), SizedBox(width: 3), Text('${files.length} file${files.length > 1 ? 's' : ''}', style: TextStyle(fontSize: 12, color: C.text4))],
+            Spacer(),
+            GestureDetector(onTap: () => _showPost(p, type),
+              child: Row(children: [Text('Open', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: C.teal)), SizedBox(width: 2), Icon(Icons.arrow_forward, size: 16, color: C.teal)])),
+          ]),
+          SizedBox(height: 10),
         ]),
-      );
+      ));
     });
   }
 
@@ -229,7 +246,6 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('PERFORMANCE', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1)),
               SizedBox(height: 6),
-              ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: (_rating['avg_percent'] ?? 0) / 100, backgroundColor: Colors.white24, color: Colors.white, minHeight: 6)),
             ])),
             SizedBox(width: 16),
             RichText(text: TextSpan(children: [
@@ -377,14 +393,116 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
       if (!mounted) return;
       final graded = subs.where((s) => s['status'] == 'graded').length;
       final pending = subs.length - graded;
-      showModalBottomSheet(context: context, isScrollControlled: true, shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      showModalBottomSheet(context: context, isScrollControlled: true,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         builder: (ctx) {
           String search = '';
-          return StatefulBuilder(builder: (ctx, setS) => DraggableScrollableSheet(expand: false, initialChildSize: 0.8, maxChildSize: 0.95, builder: (ctx, sc) {
+          dynamic selectedSub;
+          return StatefulBuilder(builder: (ctx, setS) => DraggableScrollableSheet(expand: false, initialChildSize: 0.85, maxChildSize: 0.95, builder: (ctx, sc) {
+            // Detail view for selected student
+            if (selectedSub != null) {
+              final name = selectedSub['student_name'] ?? '#${selectedSub['student_id']}';
+              final initials = name.length >= 2 ? '${name[0]}${name.split(' ').length > 1 ? name.split(' ').last[0] : name[1]}'.toUpperCase() : name[0].toUpperCase();
+              final grade = selectedSub['grade'];
+              final score = grade?['score'];
+              final feedback = grade?['feedback'];
+              final criteria = grade?['criteria'] as List<dynamic>? ?? [];
+              final files = selectedSub['files'] as List<dynamic>? ?? [];
+              return ListView(controller: sc, padding: EdgeInsets.all(20), children: [
+                Center(child: Container(width: 40, height: 4, margin: EdgeInsets.only(bottom: 16), decoration: BoxDecoration(color: C.border, borderRadius: BorderRadius.circular(2)))),
+                // Back button
+                GestureDetector(onTap: () => setS(() => selectedSub = null),
+                  child: Container(padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8), decoration: BoxDecoration(color: Theme.of(ctx).inputDecorationTheme.fillColor, borderRadius: BorderRadius.circular(12)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.arrow_back, size: 16, color: C.text4), SizedBox(width: 6), Text('Назад к списку', style: TextStyle(fontSize: 13, color: C.text4))]))),
+                SizedBox(height: 16),
+                // Student info
+                Row(children: [
+                  CircleAvatar(radius: 22, backgroundColor: C.teal.withOpacity(0.15), child: Text(initials, style: TextStyle(color: C.teal, fontWeight: FontWeight.w800, fontSize: 14))),
+                  SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(name, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                    Text(selectedSub['submitted_at'] != null ? _fmtDate(selectedSub['submitted_at']) : '', style: TextStyle(fontSize: 12, color: C.text4)),
+                  ])),
+                ]),
+                // Attached files
+                if (files.isNotEmpty || selectedSub['text_content'] != null) ...[
+                  SizedBox(height: 16),
+                  Text('ПРИКРЕПЛЁННЫЕ ФАЙЛЫ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: C.text4, letterSpacing: 1)),
+                  SizedBox(height: 8),
+                  if (selectedSub['text_content'] != null) Container(padding: EdgeInsets.all(12), margin: EdgeInsets.only(bottom: 6),
+                    decoration: BoxDecoration(color: C.teal.withOpacity(0.08), borderRadius: BorderRadius.circular(12)),
+                    child: Text(selectedSub['text_content'], style: TextStyle(fontSize: 13), maxLines: 3, overflow: TextOverflow.ellipsis)),
+                  ...files.map((f) => Container(padding: EdgeInsets.all(12), margin: EdgeInsets.only(bottom: 6),
+                    decoration: BoxDecoration(color: C.teal.withOpacity(0.08), borderRadius: BorderRadius.circular(12)),
+                    child: Row(children: [Icon(Icons.description, size: 18, color: C.teal), SizedBox(width: 8), Expanded(child: Text(f['filename'] ?? f.toString(), style: TextStyle(fontSize: 13, color: C.teal)))]))),
+                ],
+                // Score
+                if (score != null) ...[
+                  SizedBox(height: 20),
+                  Container(padding: EdgeInsets.all(16), decoration: BoxDecoration(color: Theme.of(ctx).inputDecorationTheme.fillColor, borderRadius: BorderRadius.circular(16)),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Row(children: [
+                        RichText(text: TextSpan(children: [
+                          TextSpan(text: '$score', style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: C.teal)),
+                          TextSpan(text: ' / 100', style: TextStyle(fontSize: 16, color: C.text4)),
+                        ])),
+                        Spacer(),
+                        Container(padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6), decoration: BoxDecoration(color: C.teal.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.bolt, size: 14, color: C.teal), SizedBox(width: 4), Text('ИИ-проверка', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: C.teal))])),
+                      ]),
+                      if (feedback != null) ...[
+                        SizedBox(height: 12),
+                        Text('ФИДБЕК', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: C.text4, letterSpacing: 1)),
+                        SizedBox(height: 6),
+                        Text(feedback, style: TextStyle(fontSize: 14, height: 1.6)),
+                      ],
+                    ])),
+                  // Per-criteria breakdown
+                  if (criteria.isNotEmpty) ...[
+                    SizedBox(height: 16),
+                    Text('ПО КРИТЕРИЯМ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: C.text4, letterSpacing: 1)),
+                    SizedBox(height: 8),
+                    ...criteria.map((c) => Container(margin: EdgeInsets.only(bottom: 8), padding: EdgeInsets.all(14),
+                      decoration: BoxDecoration(color: Theme.of(ctx).inputDecorationTheme.fillColor, borderRadius: BorderRadius.circular(14)),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(children: [
+                          Expanded(child: Text(c['name'] ?? '', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
+                          RichText(text: TextSpan(children: [
+                            TextSpan(text: '${c['score'] ?? 0}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: C.teal)),
+                            TextSpan(text: ' / ${c['max_score'] ?? c['weight'] ?? 0}', style: TextStyle(fontSize: 13, color: C.text4)),
+                          ])),
+                        ]),
+                        if (c['feedback'] != null) Padding(padding: EdgeInsets.only(top: 6), child: Text(c['feedback'], style: TextStyle(fontSize: 13, color: C.text4, height: 1.5))),
+                      ]))),
+                  ],
+                  SizedBox(height: 16),
+                  // Re-grade button
+                  SizedBox(width: double.infinity, height: 50, child: ElevatedButton.icon(
+                    icon: Icon(Icons.bolt, size: 18, color: Colors.white),
+                    label: Text('Перепроверить ИИ', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                    style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14)),
+                    onPressed: () async {
+                      try { await context.read<ApiService>().aiGrade(selectedSub['id']); showToast(context, 'Перепроверка запущена'); } catch (_) { showToast(context, 'Ошибка', error: true); }
+                    },
+                  )),
+                ] else ...[
+                  SizedBox(height: 20),
+                  SizedBox(width: double.infinity, height: 50, child: ElevatedButton.icon(
+                    icon: Icon(Icons.bolt, size: 18, color: Colors.white),
+                    label: Text('Оценить ИИ', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                    onPressed: () async {
+                      try { await context.read<ApiService>().aiGrade(selectedSub['id']); showToast(context, 'Оценка запущена'); } catch (_) { showToast(context, 'Ошибка', error: true); }
+                    },
+                  )),
+                ],
+                SizedBox(height: 24),
+              ]);
+            }
+            // Student list
             final filtered = subs.where((s) => search.isEmpty || (s['student_name'] ?? '').toLowerCase().contains(search.toLowerCase())).toList();
             return ListView(controller: sc, padding: EdgeInsets.all(20), children: [
               Center(child: Container(width: 40, height: 4, margin: EdgeInsets.only(bottom: 16), decoration: BoxDecoration(color: C.border, borderRadius: BorderRadius.circular(2)))),
-              // Stats row
               Row(children: [
                 _statBox('${subs.length}', 'Всего', C.text1),
                 SizedBox(width: 8),
@@ -393,35 +511,31 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
                 _statBox('$pending', 'Ожидают', C.red),
               ]),
               SizedBox(height: 16),
-              // Search
               TextField(decoration: InputDecoration(hintText: 'Поиск по ФИО студента...', prefixIcon: Icon(Icons.search, size: 18, color: C.text4), contentPadding: EdgeInsets.symmetric(vertical: 10)),
                 onChanged: (v) => setS(() => search = v)),
               SizedBox(height: 12),
-              // Student list
               ...filtered.map((s) {
                 final name = s['student_name'] ?? s['student_email'] ?? '#${s['student_id']}';
                 final initials = name.length >= 2 ? '${name[0]}${name.split(' ').length > 1 ? name.split(' ').last[0] : name[1]}'.toUpperCase() : name[0].toUpperCase();
                 final score = s['grade']?['score'];
                 final isGraded = s['status'] == 'graded';
-                return Container(margin: EdgeInsets.only(bottom: 8), padding: EdgeInsets.all(14),
-                  decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.2))),
-                  child: Row(children: [
-                    CircleAvatar(radius: 20, backgroundColor: C.teal.withOpacity(0.15), child: Text(initials, style: TextStyle(color: C.teal, fontWeight: FontWeight.w800, fontSize: 13))),
-                    SizedBox(width: 12),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(name, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-                      SizedBox(height: 2),
-                      Row(children: [
+                return GestureDetector(onTap: () => setS(() => selectedSub = s),
+                  child: Container(margin: EdgeInsets.only(bottom: 8), padding: EdgeInsets.all(14),
+                    decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(16)),
+                    child: Row(children: [
+                      CircleAvatar(radius: 20, backgroundColor: C.teal.withOpacity(0.15), child: Text(initials, style: TextStyle(color: C.teal, fontWeight: FontWeight.w800, fontSize: 13))),
+                      SizedBox(width: 12),
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(name, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                        SizedBox(height: 2),
                         Text(s['submitted_at'] != null ? _fmtDate(s['submitted_at']) : '', style: TextStyle(fontSize: 11, color: C.text4)),
-                        if (s['files_count'] != null && s['files_count'] > 0) ...[SizedBox(width: 6), Icon(Icons.attach_file, size: 11, color: C.text4), Text('${s['files_count']} файла', style: TextStyle(fontSize: 11, color: C.text4))],
+                      ])),
+                      Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                        if (score != null) Text('$score/100', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: C.teal))
+                        else Text('—', style: TextStyle(fontSize: 16, color: C.text4)),
+                        Text(isGraded ? 'Оценено' : 'Ожидает', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isGraded ? C.teal : C.yellow)),
                       ]),
-                    ])),
-                    Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                      if (score != null) Text('$score/100', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: C.teal))
-                      else Text('—', style: TextStyle(fontSize: 16, color: C.text4)),
-                      Text(isGraded ? 'Оценено' : 'Ожидает', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isGraded ? C.teal : C.yellow)),
-                    ]),
-                  ]));
+                    ])));
               }),
             ]);
           }));
@@ -435,62 +549,156 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
 
   // ── FAB menu ──
   void _showAddMenu() {
-    showModalBottomSheet(context: context, shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
-        SizedBox(height: 8), Container(width: 40, height: 4, decoration: BoxDecoration(color: C.border, borderRadius: BorderRadius.circular(2))),
-        ListTile(leading: Icon(Icons.menu_book, color: C.teal), title: Text('Добавить лекцию'), onTap: () { Navigator.pop(ctx); _createPost('lecture'); }),
-        ListTile(leading: Icon(Icons.description, color: C.yellow), title: Text('Добавить материал'), onTap: () { Navigator.pop(ctx); _createPost('material'); }),
-        ListTile(leading: Icon(Icons.assignment, color: C.green), title: Text('Создать задание'), onTap: () { Navigator.pop(ctx); _createAssignment(); }),
-        SizedBox(height: 16),
-      ])));
+    String type = 'lecture';
+    final tc = TextEditingController(), cc = TextEditingController();
+    showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => Padding(
+        padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 40, height: 4, decoration: BoxDecoration(color: C.border, borderRadius: BorderRadius.circular(2))),
+          SizedBox(height: 16),
+          // Header
+          Row(children: [
+            Container(width: 44, height: 44, decoration: BoxDecoration(color: C.teal.withOpacity(0.12), borderRadius: BorderRadius.circular(14)),
+              child: Icon(Icons.menu_book_rounded, color: C.teal, size: 22)),
+            SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Добавить лекцию', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              Text('Учебный материал для класса', style: TextStyle(fontSize: 12, color: C.text4)),
+            ])),
+            IconButton(icon: Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+          ]),
+          SizedBox(height: 20),
+          // Type toggle
+          Container(decoration: BoxDecoration(color: Theme.of(ctx).inputDecorationTheme.fillColor, borderRadius: BorderRadius.circular(14)),
+            child: Row(children: [
+              Expanded(child: GestureDetector(onTap: () => setS(() => type = 'lecture'),
+                child: Container(padding: EdgeInsets.symmetric(vertical: 12), decoration: BoxDecoration(color: type == 'lecture' ? Theme.of(ctx).colorScheme.surface : Colors.transparent, borderRadius: BorderRadius.circular(12)),
+                  child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.menu_book, size: 16, color: type == 'lecture' ? C.teal : C.text4), SizedBox(width: 6), Text('Лекция', style: TextStyle(fontWeight: FontWeight.w600, color: type == 'lecture' ? C.teal : C.text4))])))),
+              Expanded(child: GestureDetector(onTap: () => setS(() => type = 'material'),
+                child: Container(padding: EdgeInsets.symmetric(vertical: 12), decoration: BoxDecoration(color: type == 'material' ? Theme.of(ctx).colorScheme.surface : Colors.transparent, borderRadius: BorderRadius.circular(12)),
+                  child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.description_outlined, size: 16, color: type == 'material' ? C.teal : C.text4), SizedBox(width: 6), Text('Материал', style: TextStyle(fontWeight: FontWeight.w600, color: type == 'material' ? C.teal : C.text4))])))),
+            ])),
+          SizedBox(height: 20),
+          _fieldLabel2('ТЕМА ${type == 'lecture' ? 'ЛЕКЦИИ' : 'МАТЕРИАЛА'} *'),
+          TextField(controller: tc, decoration: InputDecoration(hintText: 'Например: Введение в тему...')),
+          SizedBox(height: 16),
+          _fieldLabel2('СОДЕРЖАНИЕ ${type == 'lecture' ? 'ЛЕКЦИИ' : 'МАТЕРИАЛА'}'),
+          TextField(controller: cc, decoration: InputDecoration(hintText: 'Текст лекции, ссылки на видео...'), maxLines: 4),
+          SizedBox(height: 20),
+          Row(children: [
+            Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(ctx), child: Text('Отмена'), style: OutlinedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14)))),
+            SizedBox(width: 12),
+            Expanded(child: ElevatedButton.icon(icon: Icon(Icons.add, size: 16, color: Colors.white), label: Text('Опубликовать'),
+              style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14)),
+              onPressed: () async {
+                if (tc.text.trim().isEmpty) return;
+                final prefix = type == 'lecture' ? '[LECTURE][${widget.classId}]' : '[HW][${widget.classId}]';
+                try { await context.read<ApiService>().createPost('$prefix ${tc.text.trim()}', jsonEncode({'content': cc.text})); Navigator.pop(ctx); _load(); showToast(context, 'Опубликовано'); }
+                catch (_) { showToast(context, 'Ошибка', error: true); }
+              })),
+          ]),
+        ]))));
   }
 
-  void _createPost(String type) {
-    final tc = TextEditingController(), cc = TextEditingController();
-    showDialog(context: context, builder: (ctx) => AlertDialog(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Text(type == 'lecture' ? 'Новая лекция' : 'Новый материал', style: TextStyle(fontWeight: FontWeight.w800)),
-      content: Column(mainAxisSize: MainAxisSize.min, children: [
-        TextField(controller: tc, decoration: InputDecoration(hintText: 'Заголовок')), SizedBox(height: 12),
-        TextField(controller: cc, decoration: InputDecoration(hintText: 'Содержимое, ссылки на файлы...'), maxLines: 5),
-      ]),
-      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Отмена')),
-        ElevatedButton(onPressed: () async {
-          if (tc.text.trim().isEmpty) return;
-          final prefix = type == 'lecture' ? '[LECTURE][${widget.classId}]' : '[HW][${widget.classId}]';
-          try { await context.read<ApiService>().createPost('$prefix ${tc.text.trim()}', jsonEncode({'content': cc.text})); Navigator.pop(ctx); _load(); showToast(context, 'Создано'); }
-          catch (_) { showToast(context, 'Ошибка', error: true); }
-        }, child: Text('Создать'))],
-    ));
-  }
+  void _createPost(String type) => _showAddMenu();
 
   void _createAssignment() {
     final tc = TextEditingController(), dc = TextEditingController(), sc = TextEditingController(text: '100');
     DateTime? deadline;
-    showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => AlertDialog(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Text('Создать задание', style: TextStyle(fontWeight: FontWeight.w800)),
-      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
-        TextField(controller: tc, decoration: InputDecoration(hintText: 'Название')), SizedBox(height: 12),
-        TextField(controller: dc, decoration: InputDecoration(hintText: 'Описание'), maxLines: 3), SizedBox(height: 12),
-        TextField(controller: sc, decoration: InputDecoration(hintText: 'Макс. балл'), keyboardType: TextInputType.number), SizedBox(height: 12),
-        ListTile(contentPadding: EdgeInsets.zero, leading: Icon(Icons.calendar_today, color: C.teal),
-          title: Text(deadline != null ? _fmtDate(deadline!.toIso8601String()) : 'Выбрать дедлайн', style: TextStyle(fontSize: 14)),
-          onTap: () async {
+    List<Map<String, dynamic>> criteria = [{'name': '', 'weight': 100, 'desc': ''}];
+
+    showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => DraggableScrollableSheet(expand: false, initialChildSize: 0.9, maxChildSize: 0.95,
+        builder: (ctx, scroll) => ListView(controller: scroll, padding: EdgeInsets.all(24), children: [
+          Row(children: [
+            Container(width: 44, height: 44, decoration: BoxDecoration(color: C.teal.withOpacity(0.15), borderRadius: BorderRadius.circular(14)),
+              child: Icon(Icons.edit_note, color: C.teal, size: 22)),
+            SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Новое задание', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              Text('Заполните данные задания', style: TextStyle(fontSize: 12, color: C.text4)),
+            ])),
+            IconButton(icon: Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+          ]),
+          SizedBox(height: 24),
+          _fieldLabel2('НАЗВАНИЕ ЗАДАНИЯ *'),
+          TextField(controller: tc, decoration: InputDecoration(hintText: 'Например: Контрольная работа по теме...')),
+          SizedBox(height: 16),
+          _fieldLabel2('ОПИСАНИЕ ЗАДАНИЯ'),
+          TextField(controller: dc, decoration: InputDecoration(hintText: 'Подробное описание, требования...'), maxLines: 4),
+          SizedBox(height: 16),
+          _fieldLabel2('МАКС. БАЛЛ'),
+          TextField(controller: sc, keyboardType: TextInputType.number, decoration: InputDecoration(hintText: '100')),
+          SizedBox(height: 16),
+          _fieldLabel2('ДЕДЛАЙН'),
+          GestureDetector(onTap: () async {
             final d = await showDatePicker(context: ctx, initialDate: DateTime.now().add(Duration(days: 7)), firstDate: DateTime.now(), lastDate: DateTime.now().add(Duration(days: 365)));
-            if (d != null) setS(() => deadline = d);
+            if (d != null) {
+              final t = await showTimePicker(context: ctx, initialTime: TimeOfDay(hour: 23, minute: 59));
+              setS(() => deadline = DateTime(d.year, d.month, d.day, t?.hour ?? 23, t?.minute ?? 59));
+            }
+          }, child: Container(padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(color: Theme.of(ctx).inputDecorationTheme.fillColor, borderRadius: BorderRadius.circular(14)),
+            child: Row(children: [
+              Text(deadline != null ? '${deadline!.day.toString().padLeft(2, '0')}.${deadline!.month.toString().padLeft(2, '0')}.${deadline!.year} ${deadline!.hour.toString().padLeft(2, '0')}:${deadline!.minute.toString().padLeft(2, '0')}' : 'ДД.ММ.ГГГГ --:--', style: TextStyle(fontSize: 14, color: deadline != null ? null : C.text4)),
+              Spacer(), Icon(Icons.calendar_today, size: 18, color: C.text4),
+            ]))),
+          SizedBox(height: 20),
+          // Criteria
+          Row(children: [
+            Text('КРИТЕРИИ ОЦЕНИВАНИЯ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: C.teal, letterSpacing: 1)),
+            Spacer(),
+            GestureDetector(onTap: () => setS(() => criteria.add({'name': '', 'weight': 0, 'desc': ''})),
+              child: Text('+ Добавить', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: C.teal))),
+          ]),
+          SizedBox(height: 4),
+          Text('Сумма весов должна быть равна макс. баллу (${sc.text}/${sc.text})', style: TextStyle(fontSize: 11, color: C.text4)),
+          SizedBox(height: 12),
+          ...List.generate(criteria.length, (i) {
+            final nameC = TextEditingController(text: criteria[i]['name']);
+            final weightC = TextEditingController(text: '${criteria[i]['weight']}');
+            final descC = TextEditingController(text: criteria[i]['desc'] ?? '');
+            return Container(margin: EdgeInsets.only(bottom: 10), padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(color: Theme.of(ctx).inputDecorationTheme.fillColor, borderRadius: BorderRadius.circular(14)),
+              child: Column(children: [
+                Row(children: [
+                  Text('${i + 1}', style: TextStyle(fontSize: 12, color: C.text4)),
+                  SizedBox(width: 8),
+                  Expanded(child: TextField(controller: nameC, decoration: InputDecoration(hintText: 'Название критерия', contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)), onChanged: (v) => criteria[i]['name'] = v)),
+                  SizedBox(width: 8),
+                  SizedBox(width: 60, child: TextField(controller: weightC, keyboardType: TextInputType.number, textAlign: TextAlign.center, decoration: InputDecoration(contentPadding: EdgeInsets.symmetric(vertical: 10)), onChanged: (v) => criteria[i]['weight'] = int.tryParse(v) ?? 0)),
+                  SizedBox(width: 4),
+                  GestureDetector(onTap: () { if (criteria.length > 1) setS(() => criteria.removeAt(i)); }, child: Icon(Icons.close, size: 16, color: C.red)),
+                ]),
+                SizedBox(height: 6),
+                TextField(controller: descC, decoration: InputDecoration(hintText: 'Описание (необязательно)', contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)), onChanged: (v) => criteria[i]['desc'] = v),
+              ]));
           }),
-      ])),
-      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Отмена')),
-        ElevatedButton(onPressed: () async {
-          if (tc.text.trim().isEmpty) return;
-          try { await context.read<ApiService>().createAssignment({
-            'class_id': widget.classId, 'title': tc.text.trim(), 'description': dc.text.trim(),
-            'max_score': int.tryParse(sc.text) ?? 100, 'criteria': [{'name': 'Общая оценка', 'weight': int.tryParse(sc.text) ?? 100}],
-            if (deadline != null) 'deadline': deadline!.toIso8601String(),
-          }); Navigator.pop(ctx); _loadAssignments(); showToast(context, 'Задание создано'); }
-          catch (_) { showToast(context, 'Ошибка', error: true); }
-        }, child: Text('Создать'))],
-    )));
+          SizedBox(height: 24),
+          Row(children: [
+            Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(ctx), child: Text('Отмена'), style: OutlinedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14)))),
+            SizedBox(width: 12),
+            Expanded(child: ElevatedButton.icon(icon: Icon(Icons.add, size: 16, color: Colors.white), label: Text('Создать задание'),
+              style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14)),
+              onPressed: () async {
+                if (tc.text.trim().isEmpty) return;
+                try { await context.read<ApiService>().createAssignment({
+                  'class_id': widget.classId, 'title': tc.text.trim(), 'description': dc.text.trim(),
+                  'max_score': int.tryParse(sc.text) ?? 100,
+                  'criteria': criteria.where((c) => c['name'].toString().isNotEmpty).map((c) => {'name': c['name'], 'weight': c['weight'], 'description': c['desc']}).toList(),
+                  if (deadline != null) 'deadline': deadline!.toIso8601String(),
+                }); Navigator.pop(ctx); _loadAssignments(); showToast(context, 'Задание создано'); }
+                catch (_) { showToast(context, 'Ошибка', error: true); }
+              })),
+          ]),
+          SizedBox(height: 24),
+        ]))));
   }
+
+  Widget _fieldLabel2(String s) => Padding(padding: EdgeInsets.only(bottom: 8), child: Text(s, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: C.teal, letterSpacing: 1)));
 
   void _editClass() {
     final meta = _meta;

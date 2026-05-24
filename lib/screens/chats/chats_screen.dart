@@ -1,15 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/toast.dart';
 
 class ChatsScreen extends StatefulWidget {
   const ChatsScreen({super.key});
-  @override
-  State<ChatsScreen> createState() => _ChatsScreenState();
+  @override State<ChatsScreen> createState() => _ChatsScreenState();
 }
 
 class _ChatsScreenState extends State<ChatsScreen> {
@@ -20,21 +19,12 @@ class _ChatsScreenState extends State<ChatsScreen> {
   bool _loading = true;
   final _searchCtrl = TextEditingController();
   List<dynamic> _searchResults = [];
-  bool _searching = false;
   Timer? _poller;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadChats();
-    _poller = Timer.periodic(const Duration(seconds: 5), (_) => _pollMessages());
-  }
+  static const _avatarColors = [C.teal, Color(0xFF6366F1), Color(0xFFF59E0B), Color(0xFF0891B2), Color(0xFFEC4899), Color(0xFF059669), Color(0xFFD97706), Color(0xFF64748B)];
 
-  @override
-  void dispose() {
-    _poller?.cancel();
-    super.dispose();
-  }
+  @override void initState() { super.initState(); _loadChats(); _poller = Timer.periodic(Duration(seconds: 5), (_) => _pollMessages()); }
+  @override void dispose() { _poller?.cancel(); super.dispose(); }
 
   Future<void> _loadChats() async {
     if (!mounted) return; setState(() => _loading = true);
@@ -52,80 +42,43 @@ class _ChatsScreenState extends State<ChatsScreen> {
 
   Future<void> _pollMessages() async {
     if (_activeChatId == null) return;
-    try {
-      final api = context.read<ApiService>();
-      final msgs = await api.getMessages(_activeChatId!);
-      if (mounted) setState(() => _messages[_activeChatId!] = msgs);
-    } catch (_) {}
+    try { final msgs = await context.read<ApiService>().getMessages(_activeChatId!); if (mounted) setState(() => _messages[_activeChatId!] = msgs); } catch (_) {}
   }
 
   String _chatTitle(dynamic chat) {
     final auth = context.read<AuthProvider>();
     final users = _chatUsers[chat['id']] ?? [];
     final other = users.where((u) => u['id'] != auth.userId).toList();
-    if (other.isNotEmpty) return other.first['full_name'] ?? other.first['email']?.split('@').first ?? 'Чат';
+    if (other.isNotEmpty) return other.first['full_name'] ?? other.first['email']?.split('@').first ?? 'Chat';
     final name = chat['name'] ?? '';
     return name.startsWith('Чат с ') ? name.substring(6) : name;
   }
 
-  String _lastPreview(int id) {
-    final msgs = _messages[id] ?? [];
-    if (msgs.isEmpty) return 'Нет сообщений';
-    final last = msgs.last;
-    final content = last['content'] ?? '';
-    return content.length > 45 ? '${content.substring(0, 45)}…' : content;
-  }
+  String _lastPreview(int id) { final msgs = _messages[id] ?? []; if (msgs.isEmpty) return 'No messages'; return (msgs.last['content'] ?? '').toString().length > 40 ? '${msgs.last['content'].substring(0, 40)}...' : msgs.last['content'] ?? ''; }
 
   String _chatTime(int id) {
-    final msgs = _messages[id] ?? [];
-    if (msgs.isEmpty) return '';
-    final last = msgs.last;
-    try {
-      final d = DateTime.parse(last['created_at']);
-      final now = DateTime.now();
-      if (now.difference(d).inDays == 0) return '${d.hour}:${d.minute.toString().padLeft(2, '0')}';
+    final msgs = _messages[id] ?? []; if (msgs.isEmpty) return '';
+    try { final d = DateTime.parse(msgs.last['created_at']); final now = DateTime.now();
+      if (now.difference(d).inMinutes < 5) return 'NOW';
+      if (now.difference(d).inHours < 24) return '${d.hour}:${d.minute.toString().padLeft(2, '0')}';
+      if (now.difference(d).inDays == 1) return 'YESTERDAY';
       return '${d.day}.${d.month.toString().padLeft(2, '0')}';
     } catch (_) { return ''; }
   }
 
   void _searchUsers(String q) async {
     if (q.trim().isEmpty) { setState(() => _searchResults = []); return; }
-    setState(() => _searching = true);
     try {
-      final api = context.read<ApiService>();
-      final all = await api.getUsers();
+      final all = await context.read<ApiService>().getUsers();
       final auth = context.read<AuthProvider>();
-      setState(() {
-        _searchResults = all.where((u) =>
-          u['id'] != auth.userId &&
-          ((u['email'] ?? '').toLowerCase().contains(q.toLowerCase()) ||
-           (u['full_name'] ?? '').toLowerCase().contains(q.toLowerCase()))
-        ).toList();
-      });
+      if (mounted) setState(() { _searchResults = all.where((u) => u['id'] != auth.userId && ((u['email'] ?? '').toLowerCase().contains(q.toLowerCase()) || (u['full_name'] ?? '').toLowerCase().contains(q.toLowerCase()))).toList(); });
     } catch (_) {}
-    setState(() => _searching = false);
   }
 
   Future<void> _openDM(dynamic user) async {
     final auth = context.read<AuthProvider>();
-    // Check existing
-    for (final c in _chats) {
-      final users = _chatUsers[c['id']] ?? [];
-      if (users.length == 2 && users.any((u) => u['id'] == user['id']) && users.any((u) => u['id'] == auth.userId)) {
-        setState(() { _activeChatId = c['id']; _searchCtrl.clear(); _searchResults = []; });
-        return;
-      }
-    }
-    // Create new
-    try {
-      final api = context.read<ApiService>();
-      final chat = await api.createChat('Чат с ${user['email']}');
-      await api.addChatUser(chat['id'], user['id']);
-      _searchCtrl.clear();
-      _searchResults = [];
-      await _loadChats();
-      setState(() => _activeChatId = chat['id']);
-    } catch (_) {}
+    for (final c in _chats) { final users = _chatUsers[c['id']] ?? []; if (users.length == 2 && users.any((u) => u['id'] == user['id']) && users.any((u) => u['id'] == auth.userId)) { setState(() { _activeChatId = c['id']; _searchCtrl.clear(); _searchResults = []; }); return; } }
+    try { final api = context.read<ApiService>(); final chat = await api.createChat('Чат с ${user['email']}'); await api.addChatUser(chat['id'], user['id']); _searchCtrl.clear(); _searchResults = []; await _loadChats(); setState(() => _activeChatId = chat['id']); } catch (_) {}
   }
 
   @override
@@ -135,198 +88,107 @@ class _ChatsScreenState extends State<ChatsScreen> {
   }
 
   Widget _buildChatList() {
+    final surface = Theme.of(context).colorScheme.surface;
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Row(
-                children: [
-                  const Text('Чаты', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.text1)),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: _showNewGroupDialog,
-                    icon: Container(
-                      width: 36, height: 36,
-                      decoration: BoxDecoration(color: AppColors.surface2, borderRadius: BorderRadius.circular(10), border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.3))),
-                      child: const Icon(Icons.add, size: 18, color: AppColors.text3),
+      body: SafeArea(child: Column(children: [
+        // Header
+        Padding(padding: EdgeInsets.fromLTRB(20, 16, 20, 0), child: Row(children: [
+          Text('Chats', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+        ])),
+        SizedBox(height: 12),
+        // Search
+        Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: TextField(
+          controller: _searchCtrl,
+          decoration: InputDecoration(hintText: 'Search chats...', prefixIcon: Icon(Icons.search, size: 20, color: C.text4), contentPadding: EdgeInsets.symmetric(vertical: 12)),
+          onChanged: _searchUsers,
+        )),
+        if (_searchResults.isNotEmpty) Container(
+          constraints: BoxConstraints(maxHeight: 200), margin: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(16)),
+          child: ListView(shrinkWrap: true, children: _searchResults.map((u) => ListTile(
+            leading: CircleAvatar(radius: 20, backgroundColor: _avatarColors[(u['id'] ?? 0) % _avatarColors.length].withOpacity(0.2),
+              child: Text((u['full_name'] ?? u['email'] ?? '?')[0].toUpperCase(), style: TextStyle(color: _avatarColors[(u['id'] ?? 0) % _avatarColors.length], fontWeight: FontWeight.w700))),
+            title: Text(u['full_name'] ?? u['email']?.split('@').first ?? '', style: TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text(u['email'] ?? '', style: TextStyle(fontSize: 12, color: C.text4)),
+            onTap: () => _openDM(u),
+          )).toList())),
+        SizedBox(height: 4),
+        Expanded(child: _loading
+          ? Center(child: CircularProgressIndicator(color: C.teal))
+          : _chats.isEmpty
+            ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.chat_bubble_outline_rounded, size: 56, color: C.text4),
+                SizedBox(height: 12), Text('No chats yet', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: C.text4)),
+                SizedBox(height: 4), Text('Search for someone above', style: TextStyle(fontSize: 13, color: C.text4)),
+              ]))
+            : ListView.builder(
+                padding: EdgeInsets.fromLTRB(16, 4, 16, 90),
+                itemCount: _chats.length,
+                itemBuilder: (ctx, i) {
+                  final c = _chats[i]; final id = c['id'] as int;
+                  final color = _avatarColors[id % _avatarColors.length];
+                  final title = _chatTitle(c);
+                  return GestureDetector(
+                    onTap: () => setState(() => _activeChatId = id),
+                    child: Container(
+                      margin: EdgeInsets.only(bottom: 4), padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(18)),
+                      child: Row(children: [
+                        CircleAvatar(radius: 26, backgroundColor: color.withOpacity(0.15),
+                          child: Text(title[0].toUpperCase(), style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 18))),
+                        SizedBox(width: 14),
+                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                          SizedBox(height: 3),
+                          Text(_lastPreview(id), style: TextStyle(fontSize: 13, color: C.text4), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ])),
+                        Text(_chatTime(id), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: C.text4)),
+                      ]),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: TextField(
-                controller: _searchCtrl,
-                decoration: InputDecoration(
-                  hintText: 'Поиск пользователей...',
-                  prefixIcon: const Icon(Icons.search, size: 18, color: AppColors.text4),
-                  suffixIcon: _searchCtrl.text.isNotEmpty ? IconButton(icon: const Icon(Icons.close, size: 16), onPressed: () { _searchCtrl.clear(); setState(() => _searchResults = []); }) : null,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                ),
-                onChanged: _searchUsers,
-              ),
-            ),
-            if (_searchResults.isNotEmpty)
-              Container(
-                constraints: const BoxConstraints(maxHeight: 200),
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.3)), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8)]),
-                child: ListView(
-                  shrinkWrap: true,
-                  children: _searchResults.map((u) => ListTile(
-                    leading: CircleAvatar(backgroundColor: AppColors.teal, child: Text((u['full_name'] ?? u['email'] ?? '?')[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700))),
-                    title: Text(u['full_name'] ?? u['email']?.split('@').first ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                    subtitle: Text(u['email'] ?? '', style: const TextStyle(fontSize: 12, color: AppColors.text4)),
-                    trailing: Container(width: 32, height: 32, decoration: BoxDecoration(color: AppColors.tealLight, borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.chat, size: 16, color: AppColors.teal)),
-                    onTap: () => _openDM(u),
-                  )).toList(),
-                ),
-              ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: _loading
-                ? const Center(child: CircularProgressIndicator(color: AppColors.teal))
-                : _chats.isEmpty
-                  ? const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.chat_bubble_outline_rounded, size: 48, color: AppColors.teal), SizedBox(height: 12), Text('Нет чатов', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.text3)), Text('Найдите пользователя в поиске', style: TextStyle(fontSize: 13, color: AppColors.text4))]))
-                  : ListView.builder(
-                      padding: EdgeInsets.only(bottom: 80), itemCount: _chats.length,
-                      itemBuilder: (context, i) {
-                        final c = _chats[i];
-                        final id = c['id'] as int;
-                        return ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                          leading: CircleAvatar(
-                            backgroundColor: AppColors.teal.withOpacity(0.2 + (id % 6) * 0.1),
-                            child: Text(_chatTitle(c)[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                          ),
-                          title: Text(_chatTitle(c), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                          subtitle: Text(_lastPreview(id), style: const TextStyle(fontSize: 12, color: AppColors.text4), maxLines: 1, overflow: TextOverflow.ellipsis),
-                          trailing: Text(_chatTime(id), style: const TextStyle(fontSize: 11, color: AppColors.text4)),
-                          onTap: () => setState(() => _activeChatId = id),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
-      ),
+                  );
+                })),
+      ])),
+      floatingActionButton: Padding(padding: EdgeInsets.only(bottom: 76),
+        child: FloatingActionButton(backgroundColor: C.teal, child: Icon(Icons.edit_outlined, color: Colors.white), onPressed: () {
+          _searchCtrl.text = ''; FocusScope.of(context).requestFocus(FocusNode());
+          showToast(context, 'Use the search bar to find users');
+        })),
     );
   }
 
   Widget _buildChatView() {
     final msgs = _messages[_activeChatId] ?? [];
-    final chat = _chats.firstWhere((c) => c['id'] == _activeChatId, orElse: () => {'name': 'Чат'});
+    final chat = _chats.firstWhere((c) => c['id'] == _activeChatId, orElse: () => {'name': 'Chat'});
     final msgCtrl = TextEditingController();
     final auth = context.read<AuthProvider>();
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => setState(() => _activeChatId = null)),
-        title: Text(_chatTitle(chat)),
-        titleTextStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.text1, fontFamily: 'Outfit'),
+        leading: IconButton(icon: Icon(Icons.arrow_back), onPressed: () => setState(() => _activeChatId = null)),
+        title: Text(_chatTitle(chat), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: msgs.isEmpty
-              ? const Center(child: Text('Нет сообщений', style: TextStyle(color: AppColors.text4)))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: msgs.length,
-                  itemBuilder: (context, i) {
-                    final m = msgs[i];
-                    final isMe = m['user_id'] == auth.userId;
-                    return Align(
-                      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 6),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-                        decoration: BoxDecoration(
-                          color: isMe ? AppColors.teal : AppColors.surface2,
-                          borderRadius: BorderRadius.circular(14).copyWith(
-                            bottomRight: isMe ? const Radius.circular(4) : null,
-                            bottomLeft: !isMe ? const Radius.circular(4) : null,
-                          ),
-                        ),
-                        child: Text(m['content'] ?? '', style: TextStyle(fontSize: 14, color: isMe ? Colors.white : AppColors.text1)),
-                      ),
-                    );
-                  },
-                ),
-          ),
-          Container(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 88),
-            decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, border: Border(top: BorderSide(color: AppColors.border))),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: msgCtrl,
-                    decoration: InputDecoration(hintText: 'Сообщение...', border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: AppColors.border)), contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10)),
-                    onSubmitted: (_) async {
-                      if (msgCtrl.text.trim().isEmpty) return;
-                      try {
-                        final api = context.read<ApiService>();
-                        await api.sendMessage(_activeChatId!, msgCtrl.text.trim());
-                        msgCtrl.clear();
-                        _pollMessages();
-                      } catch (_) {}
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  width: 44, height: 44,
-                  decoration: BoxDecoration(color: AppColors.teal, borderRadius: BorderRadius.circular(12)),
-                  child: IconButton(
-                    onPressed: () async {
-                      if (msgCtrl.text.trim().isEmpty) return;
-                      try {
-                        final api = context.read<ApiService>();
-                        await api.sendMessage(_activeChatId!, msgCtrl.text.trim());
-                        msgCtrl.clear();
-                        _pollMessages();
-                      } catch (_) {}
-                    },
-                    icon: const Icon(Icons.send, color: Colors.white, size: 20),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showNewGroupDialog() {
-    final nameCtrl = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Новый групповой чат', style: TextStyle(fontWeight: FontWeight.w800)),
-        content: TextField(controller: nameCtrl, decoration: const InputDecoration(hintText: 'Название группы')),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Отмена')),
-          ElevatedButton(
-            onPressed: () async {
-              if (nameCtrl.text.trim().isEmpty) return;
-              try {
-                final api = context.read<ApiService>();
-                await api.createChat(nameCtrl.text.trim());
-                Navigator.pop(ctx);
-                _loadChats();
-              } catch (_) {}
-            },
-            child: const Text('Создать'),
-          ),
-        ],
-      ),
+      body: Column(children: [
+        Expanded(child: msgs.isEmpty
+          ? Center(child: Text('No messages', style: TextStyle(color: C.text4)))
+          : ListView.builder(padding: EdgeInsets.all(12), itemCount: msgs.length, itemBuilder: (ctx, i) {
+              final m = msgs[i]; final isMe = m['user_id'] == auth.userId;
+              return Align(alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                child: Container(margin: EdgeInsets.only(bottom: 6), padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+                  decoration: BoxDecoration(color: isMe ? C.teal : Theme.of(context).inputDecorationTheme.fillColor,
+                    borderRadius: BorderRadius.circular(18).copyWith(bottomRight: isMe ? Radius.circular(4) : null, bottomLeft: !isMe ? Radius.circular(4) : null)),
+                  child: Text(m['content'] ?? '', style: TextStyle(fontSize: 14, color: isMe ? Colors.white : null))));
+            })),
+        Container(padding: EdgeInsets.fromLTRB(12, 8, 12, 88), color: Theme.of(context).colorScheme.surface,
+          child: Row(children: [
+            Expanded(child: TextField(controller: msgCtrl, decoration: InputDecoration(hintText: 'Message...', border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none), contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10)),
+              onSubmitted: (_) async { if (msgCtrl.text.trim().isEmpty) return; try { await context.read<ApiService>().sendMessage(_activeChatId!, msgCtrl.text.trim()); msgCtrl.clear(); _pollMessages(); } catch (_) {} })),
+            SizedBox(width: 8),
+            Container(width: 44, height: 44, decoration: BoxDecoration(color: C.teal, borderRadius: BorderRadius.circular(14)),
+              child: IconButton(onPressed: () async { if (msgCtrl.text.trim().isEmpty) return; try { await context.read<ApiService>().sendMessage(_activeChatId!, msgCtrl.text.trim()); msgCtrl.clear(); _pollMessages(); } catch (_) {} },
+                icon: Icon(Icons.send, color: Colors.white, size: 20))),
+          ])),
+      ]),
     );
   }
 }

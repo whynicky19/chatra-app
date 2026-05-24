@@ -7,18 +7,16 @@ class ThemeProvider extends ChangeNotifier {
   bool get isDark => _mode == ThemeMode.dark;
 
   Future<void> init() async {
-    final prefs = await SharedPreferences.getInstance();
-    _mode = prefs.getString('theme') == 'dark' ? ThemeMode.dark : ThemeMode.light;
-    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _mode = prefs.getString('theme') == 'dark' ? ThemeMode.dark : ThemeMode.light;
+      notifyListeners();
+    } catch (_) {}
   }
 
   void toggle() {
     _mode = isDark ? ThemeMode.light : ThemeMode.dark;
-    // Save async without blocking
-    SharedPreferences.getInstance().then((p) => p.setString('theme', isDark ? 'dark' : 'light'));
-    // Delay notify to let current frame finish
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      notifyListeners();
-    });
+    notifyListeners();
+    SharedPreferences.getInstance().then((p) => p.setString('theme', isDark ? 'dark' : 'light')).catchError((_) {});
   }
 }
