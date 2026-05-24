@@ -71,7 +71,7 @@ class _AiScreenState extends State<AiScreen> {
             Spacer(),
             if (_msgs.isNotEmpty) IconButton(icon: Icon(Icons.delete_outline, color: AppColors.text4), onPressed: () => setState(() => _msgs.clear())),
             Container(padding: EdgeInsets.symmetric(horizontal: 12, vertical: 5), decoration: BoxDecoration(color: AppColors.greenLt, borderRadius: BorderRadius.circular(20)),
-              child: Text('● Онлайн', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.green))),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [Container(width: 6, height: 6, decoration: BoxDecoration(color: AppColors.green, shape: BoxShape.circle)), SizedBox(width: 4), Text('Онлайн', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.green))])),
           ]),
         ),
         // Messages
@@ -105,7 +105,7 @@ class _AiScreenState extends State<AiScreen> {
             }),
         ),
         // Input
-        Container(padding: EdgeInsets.fromLTRB(12, 8, 12, 12), decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, border: Border(top: BorderSide(color: AppColors.border))),
+        Container(padding: EdgeInsets.fromLTRB(12, 8, 12, 88), decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface),
           child: Row(children: [
             Expanded(child: TextField(controller: _ctrl,
               decoration: InputDecoration(hintText: 'Написать сообщение...', border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: AppColors.border)), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: AppColors.border)), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: AppColors.teal)), contentPadding: EdgeInsets.symmetric(horizontal: 18, vertical: 12)),

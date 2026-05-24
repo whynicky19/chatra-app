@@ -37,7 +37,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
   }
 
   Future<void> _loadChats() async {
-    setState(() => _loading = true);
+    if (!mounted) return; setState(() => _loading = true);
     try {
       final api = context.read<ApiService>();
       _chats = await api.getChats();
@@ -47,7 +47,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
         try { _messages[id] = await api.getMessages(id); } catch (_) {}
       }
     } catch (_) {}
-    setState(() => _loading = false);
+    if (mounted) setState(() => _loading = false);
   }
 
   Future<void> _pollMessages() async {
@@ -190,9 +190,9 @@ class _ChatsScreenState extends State<ChatsScreen> {
               child: _loading
                 ? const Center(child: CircularProgressIndicator(color: AppColors.teal))
                 : _chats.isEmpty
-                  ? const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [Text('💬', style: TextStyle(fontSize: 48)), SizedBox(height: 12), Text('Нет чатов', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.text3)), Text('Найдите пользователя в поиске', style: TextStyle(fontSize: 13, color: AppColors.text4))]))
+                  ? const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.chat_bubble_outline_rounded, size: 48, color: AppColors.teal), SizedBox(height: 12), Text('Нет чатов', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.text3)), Text('Найдите пользователя в поиске', style: TextStyle(fontSize: 13, color: AppColors.text4))]))
                   : ListView.builder(
-                      itemCount: _chats.length,
+                      padding: EdgeInsets.only(bottom: 80), itemCount: _chats.length,
                       itemBuilder: (context, i) {
                         final c = _chats[i];
                         final id = c['id'] as int;
@@ -259,7 +259,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
                 ),
           ),
           Container(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 88),
             decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, border: Border(top: BorderSide(color: AppColors.border))),
             child: Row(
               children: [

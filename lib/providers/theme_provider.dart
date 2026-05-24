@@ -8,15 +8,17 @@ class ThemeProvider extends ChangeNotifier {
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
-    final t = prefs.getString('theme');
-    _mode = t == 'dark' ? ThemeMode.dark : ThemeMode.light;
+    _mode = prefs.getString('theme') == 'dark' ? ThemeMode.dark : ThemeMode.light;
     notifyListeners();
   }
 
-  Future<void> toggle() async {
+  void toggle() {
     _mode = isDark ? ThemeMode.light : ThemeMode.dark;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('theme', isDark ? 'dark' : 'light');
-    notifyListeners();
+    // Save async without blocking
+    SharedPreferences.getInstance().then((p) => p.setString('theme', isDark ? 'dark' : 'light'));
+    // Delay notify to let current frame finish
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
   }
 }

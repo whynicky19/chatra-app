@@ -63,10 +63,7 @@ class ApiService {
   // ── Auth ──
   Future<Map<String, dynamic>> login(String email, String password) async {
     final response = await _dio.post('/auth/login',
-      data: {
-        'username': email,
-        'password': password,
-      },
+      data: 'username=${Uri.encodeComponent(email)}&password=${Uri.encodeComponent(password)}',
       options: Options(contentType: 'application/x-www-form-urlencoded'),
     );
     return response.data;
@@ -311,6 +308,17 @@ class ApiService {
 
   Future<void> adminDelete(int userId) async {
     await _dio.delete('/admin/users/$userId');
+  }
+
+  Future<List<dynamic>> adminAiUsage({int? classId}) async {
+    final params = classId != null ? {'class_id': classId} : null;
+    final response = await _dio.get('/admin/ai-usage', queryParameters: params);
+    return response.data;
+  }
+
+  Future<List<dynamic>> adminAiSummary() async {
+    final response = await _dio.get('/admin/ai-usage/summary');
+    return response.data;
   }
 
   Future<void> adminSetAiUnlimited(int userId, bool unlimited) async {

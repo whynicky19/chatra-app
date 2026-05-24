@@ -26,17 +26,17 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
   void initState() { super.initState(); _tabCtrl = TabController(length: 4, vsync: this); _tabCtrl.addListener(() { if (_tabCtrl.index == 2 && _assignments.isEmpty) _loadAssignments(); }); _load(); }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    if (!mounted) return; setState(() => _loading = true);
     final api = context.read<ApiService>();
     try { _posts = await api.getPosts(); } catch (_) {}
     if (!context.read<AuthProvider>().isTeacher) {
       try { _rating = await api.getMyRating(classId: widget.classId); } catch (_) {}
     }
-    setState(() => _loading = false);
+    if (mounted) setState(() => _loading = false);
   }
 
   Future<void> _loadAssignments() async {
-    setState(() => _loadingAsg = true);
+    if (!mounted) return; setState(() => _loadingAsg = true);
     final api = context.read<ApiService>();
     try {
       _assignments = await api.getAssignments(classId: widget.classId);
@@ -44,7 +44,7 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
         try { _mySubs = await api.getMySubmissions(); } catch (_) {}
       }
     } catch (_) {}
-    setState(() => _loadingAsg = false);
+    if (mounted) setState(() => _loadingAsg = false);
   }
 
   Map<String, dynamic> get _meta {
@@ -107,7 +107,24 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
         ],
         body: Column(children: [
           Container(color: surfaceColor, child: TabBar(controller: _tabCtrl, labelColor: C.teal, unselectedLabelColor: C.text4, indicatorColor: C.teal, labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-            tabs: [Tab(text: 'Лекции (${_lectures.length})'), Tab(text: 'Материалы (${_materials.length})'), Tab(text: 'Задания'), Tab(text: '✨ AI')])),
+            tabs: [Tab(text: 'Лекции (${_lectures.length})'), Tab(text: 'Материалы (${_materials.length})'), Tab(text: 'Задания'), Tab(text: 'AI Chat')])),
+          // Teacher action buttons below tabs
+          if (auth.isTeacher) Container(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8), color: surfaceColor,
+            child: Row(children: [
+              Expanded(child: OutlinedButton.icon(
+                icon: Icon(Icons.add, size: 16), label: Text('Assignment', style: TextStyle(fontSize: 13)),
+                onPressed: () => _createAssignment(),
+                style: OutlinedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 12)),
+              )),
+              SizedBox(width: 10),
+              Expanded(child: ElevatedButton.icon(
+                icon: Icon(Icons.add, size: 16, color: Colors.white), label: Text('Add', style: TextStyle(fontSize: 13)),
+                onPressed: () => _showAddMenu(),
+                style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 12)),
+              )),
+            ]),
+          ),
           Expanded(child: TabBarView(controller: _tabCtrl, children: [
             _postList(_lectures, 'lecture'),
             _postList(_materials, 'material'),
@@ -116,39 +133,78 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
           ])),
         ]),
       ),
-      floatingActionButton: auth.isTeacher ? FloatingActionButton(backgroundColor: C.teal, child: Icon(Icons.add, color: Colors.white),
-        onPressed: () => _showAddMenu()) : null,
+      floatingActionButton: null,
     );
   }
 
   // ── Posts list ──
   Widget _postList(List<dynamic> posts, String type) {
-    final surfaceColor = Theme.of(context).colorScheme.surface;
+    final surface = Theme.of(context).colorScheme.surface;
+    final isTeacher = context.read<AuthProvider>().isTeacher;
     if (posts.isEmpty) return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Text(type == 'lecture' ? '📖' : '📦', style: TextStyle(fontSize: 40)),
-      SizedBox(height: 12), Text(type == 'lecture' ? 'Нет лекций' : 'Нет материалов', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: C.text3)),
+      Icon(type == 'lecture' ? Icons.menu_book_rounded : Icons.inventory_2_outlined, size: 48, color: C.teal),
+      SizedBox(height: 12), Text(type == 'lecture' ? 'No lectures yet' : 'No materials yet', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: C.text4)),
     ]));
-    return ListView.builder(padding: EdgeInsets.all(12), itemCount: posts.length, itemBuilder: (ctx, i) {
-      final p = posts[i]; final body = _preview(p);
-      final files = _extractFiles(p);
-      return Container(margin: EdgeInsets.only(bottom: 10), decoration: BoxDecoration(color: surfaceColor, borderRadius: BorderRadius.circular(14), border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.3))),
-        child: InkWell(borderRadius: BorderRadius.circular(14), onTap: () => _showPost(p, type), child: Padding(padding: EdgeInsets.all(14), child: Row(children: [
-          Container(width: 42, height: 42, decoration: BoxDecoration(color: type == 'lecture' ? C.tealLt : Color(0xFFFFF7ED), borderRadius: BorderRadius.circular(12)),
-            child: Icon(type == 'lecture' ? Icons.menu_book : Icons.description, color: type == 'lecture' ? C.teal : C.yellow, size: 20)),
-          SizedBox(width: 12),
+    return ListView.builder(padding: EdgeInsets.fromLTRB(12, 4, 12, 90), itemCount: posts.length, itemBuilder: (ctx, i) {
+      final p = posts[i]; final files = _extractFiles(p);
+      return Container(
+        margin: EdgeInsets.only(bottom: 12), padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(18)),
+        child: Row(children: [
+          Container(width: 48, height: 48,
+            decoration: BoxDecoration(color: C.teal.withOpacity(0.12), borderRadius: BorderRadius.circular(14)),
+            child: Icon(Icons.menu_book_rounded, color: C.teal, size: 22)),
+          SizedBox(width: 14),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(_clean(p['title'] ?? ''), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700), maxLines: 2, overflow: TextOverflow.ellipsis),
-            if (body.isNotEmpty) Padding(padding: EdgeInsets.only(top: 4), child: Text(body, style: TextStyle(fontSize: 12, color: C.text4), maxLines: 1, overflow: TextOverflow.ellipsis)),
-            SizedBox(height: 4),
+            Text(_clean(p['title'] ?? ''), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
+            SizedBox(height: 6),
             Row(children: [
-              Icon(Icons.calendar_today, size: 11, color: C.text4), SizedBox(width: 4),
-              Text(_fmtDate(p['created_at'] ?? ''), style: TextStyle(fontSize: 11, color: C.text4)),
-              if (files.isNotEmpty) ...[SizedBox(width: 10), Icon(Icons.attach_file, size: 11, color: C.text4), SizedBox(width: 2), Text('${files.length} файл', style: TextStyle(fontSize: 11, color: C.text4))],
+              Icon(Icons.calendar_today, size: 12, color: C.text4), SizedBox(width: 4),
+              Text(_fmtDate(p['created_at'] ?? ''), style: TextStyle(fontSize: 12, color: C.text4)),
+              if (files.isNotEmpty) ...[SizedBox(width: 10), Icon(Icons.description_outlined, size: 12, color: C.text4), SizedBox(width: 3), Text('${files.length} file', style: TextStyle(fontSize: 12, color: C.text4))],
             ]),
           ])),
-          Icon(Icons.chevron_right, color: C.text4, size: 20),
-        ]))));
+          if (isTeacher) ...[
+            _iconBtn(Icons.edit_outlined, () => _editPost(p)),
+            SizedBox(width: 4),
+            _iconBtn(Icons.delete_outline, () async { try { await context.read<ApiService>().deletePost(p['id']); _load(); } catch (_) {} }),
+            SizedBox(width: 8),
+          ],
+          GestureDetector(onTap: () => _showPost(p, type),
+            child: Text('Open →', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: C.teal))),
+        ]),
+      );
     });
+  }
+
+  Widget _iconBtn(IconData ic, VoidCallback onTap) => GestureDetector(onTap: onTap,
+    child: Container(width: 34, height: 34, decoration: BoxDecoration(color: C.teal.withOpacity(0.08), borderRadius: BorderRadius.circular(10)),
+      child: Icon(ic, size: 17, color: C.text4)));
+
+  void _editPost(dynamic p) {
+    final tc = TextEditingController(text: _clean(p['title'] ?? ''));
+    final cc = TextEditingController(text: (() { try { return jsonDecode(p['body'])['content'] ?? ''; } catch (_) { return p['body'] ?? ''; } })());
+    showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => Padding(padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 40, height: 4, decoration: BoxDecoration(color: C.border, borderRadius: BorderRadius.circular(2))),
+          SizedBox(height: 20), Text('Edit', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+          SizedBox(height: 16), TextField(controller: tc, decoration: InputDecoration(labelText: 'Title')),
+          SizedBox(height: 12), TextField(controller: cc, decoration: InputDecoration(labelText: 'Content'), maxLines: 5),
+          SizedBox(height: 20),
+          Row(children: [
+            Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel'))),
+            SizedBox(width: 12),
+            Expanded(child: ElevatedButton(onPressed: () async {
+              try {
+                final prefix = (p['title'] ?? '').startsWith('[LECTURE]') ? '[LECTURE][${widget.classId}] ' : '[HW][${widget.classId}] ';
+                await context.read<ApiService>().updatePost(p['id'], '$prefix${tc.text.trim()}', jsonEncode({'content': cc.text}));
+                Navigator.pop(ctx); _load(); showToast(context, 'Updated');
+              } catch (_) { showToast(context, 'Error', error: true); }
+            }, child: Text('Save'))),
+          ]),
+        ])));
   }
 
   List<String> _extractFiles(dynamic p) {
@@ -161,7 +217,7 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
   Widget _assignmentsTab(AuthProvider auth) {
     if (_loadingAsg) return Center(child: CircularProgressIndicator(color: C.teal));
     final surfaceColor = Theme.of(context).colorScheme.surface;
-    return ListView(padding: EdgeInsets.all(12), children: [
+    return ListView(padding: EdgeInsets.fromLTRB(12, 12, 12, 90), children: [
       // Rating card (students)
       if (!auth.isTeacher && _rating.isNotEmpty) Container(
         margin: EdgeInsets.only(bottom: 16), padding: EdgeInsets.all(16),
@@ -193,7 +249,7 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
       ]),
       SizedBox(height: 12),
       if (_assignments.isEmpty) Container(padding: EdgeInsets.all(40), child: Center(child: Column(children: [
-        Text('📋', style: TextStyle(fontSize: 40)), SizedBox(height: 8),
+        Icon(Icons.assignment_outlined, size: 48, color: C.teal), SizedBox(height: 8),
         Text('Нет заданий', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: C.text3)),
       ]))),
       // Assignment cards
@@ -319,20 +375,63 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
     try {
       final subs = await context.read<ApiService>().getSubmissions(aId);
       if (!mounted) return;
+      final graded = subs.where((s) => s['status'] == 'graded').length;
+      final pending = subs.length - graded;
       showModalBottomSheet(context: context, isScrollControlled: true, shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-        builder: (ctx) => DraggableScrollableSheet(expand: false, initialChildSize: 0.6, builder: (ctx, sc) => ListView(controller: sc, padding: EdgeInsets.all(20), children: [
-          Text('Работы (${subs.length})', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)), SizedBox(height: 12),
-          if (subs.isEmpty) Padding(padding: EdgeInsets.all(32), child: Center(child: Text('Пока нет работ', style: TextStyle(color: C.text4)))),
-          ...subs.map((s) => Container(margin: EdgeInsets.only(bottom: 10), padding: EdgeInsets.all(14), decoration: BoxDecoration(color: C.surface2, borderRadius: BorderRadius.circular(12)),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [Icon(Icons.person, size: 16, color: C.teal), SizedBox(width: 6), Text(s['student_name'] ?? '#${s['student_id']}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)), Spacer(),
-                Container(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: s['status'] == 'graded' ? C.greenLt : C.tealLt, borderRadius: BorderRadius.circular(12)),
-                  child: Text(s['status'] ?? '', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: s['status'] == 'graded' ? C.green : C.teal)))]),
-              if (s['text_content'] != null) Padding(padding: EdgeInsets.only(top: 8), child: Text(s['text_content'], style: TextStyle(fontSize: 13), maxLines: 3, overflow: TextOverflow.ellipsis)),
-            ]))),
-        ])));
+        builder: (ctx) {
+          String search = '';
+          return StatefulBuilder(builder: (ctx, setS) => DraggableScrollableSheet(expand: false, initialChildSize: 0.8, maxChildSize: 0.95, builder: (ctx, sc) {
+            final filtered = subs.where((s) => search.isEmpty || (s['student_name'] ?? '').toLowerCase().contains(search.toLowerCase())).toList();
+            return ListView(controller: sc, padding: EdgeInsets.all(20), children: [
+              Center(child: Container(width: 40, height: 4, margin: EdgeInsets.only(bottom: 16), decoration: BoxDecoration(color: C.border, borderRadius: BorderRadius.circular(2)))),
+              // Stats row
+              Row(children: [
+                _statBox('${subs.length}', 'Всего', C.text1),
+                SizedBox(width: 8),
+                _statBox('$graded', 'Проверено', C.teal),
+                SizedBox(width: 8),
+                _statBox('$pending', 'Ожидают', C.red),
+              ]),
+              SizedBox(height: 16),
+              // Search
+              TextField(decoration: InputDecoration(hintText: 'Поиск по ФИО студента...', prefixIcon: Icon(Icons.search, size: 18, color: C.text4), contentPadding: EdgeInsets.symmetric(vertical: 10)),
+                onChanged: (v) => setS(() => search = v)),
+              SizedBox(height: 12),
+              // Student list
+              ...filtered.map((s) {
+                final name = s['student_name'] ?? s['student_email'] ?? '#${s['student_id']}';
+                final initials = name.length >= 2 ? '${name[0]}${name.split(' ').length > 1 ? name.split(' ').last[0] : name[1]}'.toUpperCase() : name[0].toUpperCase();
+                final score = s['grade']?['score'];
+                final isGraded = s['status'] == 'graded';
+                return Container(margin: EdgeInsets.only(bottom: 8), padding: EdgeInsets.all(14),
+                  decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.2))),
+                  child: Row(children: [
+                    CircleAvatar(radius: 20, backgroundColor: C.teal.withOpacity(0.15), child: Text(initials, style: TextStyle(color: C.teal, fontWeight: FontWeight.w800, fontSize: 13))),
+                    SizedBox(width: 12),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(name, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                      SizedBox(height: 2),
+                      Row(children: [
+                        Text(s['submitted_at'] != null ? _fmtDate(s['submitted_at']) : '', style: TextStyle(fontSize: 11, color: C.text4)),
+                        if (s['files_count'] != null && s['files_count'] > 0) ...[SizedBox(width: 6), Icon(Icons.attach_file, size: 11, color: C.text4), Text('${s['files_count']} файла', style: TextStyle(fontSize: 11, color: C.text4))],
+                      ]),
+                    ])),
+                    Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                      if (score != null) Text('$score/100', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: C.teal))
+                      else Text('—', style: TextStyle(fontSize: 16, color: C.text4)),
+                      Text(isGraded ? 'Оценено' : 'Ожидает', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isGraded ? C.teal : C.yellow)),
+                    ]),
+                  ]));
+              }),
+            ]);
+          }));
+        });
     } catch (_) { showToast(context, 'Ошибка загрузки', error: true); }
   }
+
+  Widget _statBox(String val, String label, Color color) => Expanded(child: Container(
+    padding: EdgeInsets.all(14), decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.2))),
+    child: Column(children: [Text(val, style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: color)), SizedBox(height: 2), Text(label, style: TextStyle(fontSize: 11, color: C.text4))])));
 
   // ── FAB menu ──
   void _showAddMenu() {
@@ -406,7 +505,8 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
       actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Отмена')),
         ElevatedButton(onPressed: () async {
           try {
-            final post = _posts.firstWhere((p) => p['id'] == widget.classId);
+            final post = _posts.firstWhere((p) => p['id'] == widget.classId, orElse: () => null);
+            if (post == null) return;
             var body = <String, dynamic>{}; try { body = jsonDecode(post['body']); } catch (_) {}
             body['type'] = 'class'; body['description'] = dc.text.trim(); body['teacher_name'] = tn.text.trim();
             await context.read<ApiService>().updatePost(widget.classId, tc.text.trim(), jsonEncode(body));
@@ -443,7 +543,7 @@ class _AiChatState extends State<_AiChat> {
       final data = await api.aiChat(apiMsgs, classId: widget.classId);
       setState(() => _msgs.add({'role': 'assistant', 'text': data['content'] ?? 'Нет ответа'}));
     } catch (_) { setState(() => _msgs.add({'role': 'assistant', 'text': 'Ошибка соединения'})); }
-    setState(() => _loading = false);
+    if (mounted) setState(() => _loading = false);
   }
 
   @override Widget build(BuildContext context) {
@@ -457,7 +557,7 @@ class _AiChatState extends State<_AiChat> {
               decoration: BoxDecoration(color: isU ? C.teal : C.surface2, borderRadius: BorderRadius.circular(14).copyWith(bottomRight: isU ? Radius.circular(4) : null, bottomLeft: !isU ? Radius.circular(4) : null)),
               child: SelectableText(m['text'] ?? '', style: TextStyle(fontSize: 14, color: isU ? Colors.white : Theme.of(context).textTheme.bodyLarge?.color, height: 1.5))));
           })),
-      Container(padding: EdgeInsets.fromLTRB(12, 8, 12, 12), decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, border: Border(top: BorderSide(color: Theme.of(context).dividerColor))),
+      Container(padding: EdgeInsets.fromLTRB(12, 8, 12, 88), decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, border: Border(top: BorderSide(color: Theme.of(context).dividerColor))),
         child: Row(children: [
           Expanded(child: TextField(controller: _ctrl, decoration: InputDecoration(hintText: 'Спросите...', border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: C.border)), contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10)), onSubmitted: (_) => _send())),
           SizedBox(width: 8),
