@@ -1,25 +1,8 @@
 # Chatra Mobile App
 
-Flutter-приложение для образовательной платформы [Chatra](https://github.com/whynicky19).
+Flutter-приложение для образовательной платформы
 
-## Стек
 
-- **Flutter** >= 3.19 / **Dart** >= 3.0
-- **Provider** — управление состоянием
-- **HTTP** — взаимодействие с REST API
-- Бэкенд: FastAPI + PostgreSQL ([chatra-backend](https://github.com/whynicky19))
-
-## Функционал
-
-| Модуль | Описание |
-|--------|----------|
-| 🔐 Авторизация | Вход / регистрация, выбор группы |
-| 📚 Классы | Каталог курсов, вступление по коду, создание (учитель) |
-| 📖 Контент | Лекции, материалы, задания с дедлайнами и рейтингом |
-| 💬 Чаты | Личные и групповые сообщения, поиск пользователей |
-| 🤖 AI | Чат-ассистент (общий и внутри класса) |
-| ⚙️ Настройки | Редактирование профиля |
-| 🎨 Темы | Светлая и тёмная тема |
 
 ## Быстрый старт
 
@@ -46,30 +29,13 @@ final apiService = ApiService(baseUrl: 'http://YOUR_SERVER_IP:8000');
 | Реальное устройство (Wi-Fi) | `http://192.168.X.X:8000` |
 | Продакшн | `https://your-domain.com` |
 
-### 3. (Android) Разрешить HTTP
 
-В `android/app/src/main/AndroidManifest.xml`:
-
-```xml
-<application android:usesCleartextTraffic="true" ...>
-```
-
-### 4. Запустить
+### 3. Запустить
 
 ```bash
 flutter run
 ```
 
-## Сборка
-
-```bash
-# Android APK
-flutter build apk --release
-# → build/app/outputs/flutter-apk/app-release.apk
-
-# iOS (только macOS)
-flutter build ios --release
-```
 
 ## Структура проекта
 
