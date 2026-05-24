@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'services/api_service.dart';
 import 'providers/auth_provider.dart';
+import 'providers/theme_provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
@@ -13,19 +14,15 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp, DeviceOrientation.portraitDown]);
 
-  // ═══════════════════════════════════════════════
-  // УКАЖИТЕ АДРЕС ВАШЕГО БЭКЕНДА:
-  // Android эмулятор → http://10.0.2.2:8000
-  // iOS симулятор    → http://localhost:8000
-  // Реальный телефон → http://192.168.X.X:8000
-  // ═══════════════════════════════════════════════
   final api = ApiService(baseUrl: 'http://10.0.2.2:8000');
   final auth = AuthProvider(api);
+  final theme = ThemeProvider();
 
   runApp(MultiProvider(
     providers: [
       Provider<ApiService>.value(value: api),
       ChangeNotifierProvider<AuthProvider>.value(value: auth),
+      ChangeNotifierProvider<ThemeProvider>.value(value: theme),
     ],
     child: ChatraApp(),
   ));
@@ -40,17 +37,20 @@ class _ChatraAppState extends State<ChatraApp> {
   @override
   void initState() {
     super.initState();
-    final auth = context.read<AuthProvider>();
-    auth.init();
-    context.read<ApiService>().onUnauthorized = () => auth.logout();
+    context.read<AuthProvider>().init();
+    context.read<ThemeProvider>().init();
+    context.read<ApiService>().onUnauthorized = () => context.read<AuthProvider>().logout();
   }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final theme = context.watch<ThemeProvider>();
     return MaterialApp(
       title: 'Chatra', debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: theme.mode,
       home: !auth.initialized ? _Splash() : auth.isAuthenticated ? MainShell() : LoginScreen(),
       onGenerateRoute: (s) {
         switch (s.name) {
@@ -68,7 +68,6 @@ class _ChatraAppState extends State<ChatraApp> {
 class _Splash extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: C.bg,
     body: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
       Container(width: 80, height: 80, decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), gradient: LinearGradient(colors: [C.teal, C.tealDk]), boxShadow: [BoxShadow(color: C.teal.withOpacity(0.3), blurRadius: 20, offset: Offset(0, 8))]),
         child: Icon(Icons.school_rounded, color: Colors.white, size: 40)),

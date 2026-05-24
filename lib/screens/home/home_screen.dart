@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -233,53 +234,59 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: Container(
                             margin: const EdgeInsets.only(bottom: 16),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: Theme.of(context).colorScheme.surface,
                               borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: AppColors.border),
+                              border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.3)),
                               boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 // Cover
-                                Container(
-                                  height: 140,
-                                  decoration: BoxDecoration(
-                                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                                    gradient: coverImg == null ? LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight) : null,
-                                    image: coverImg != null ? DecorationImage(image: NetworkImage(coverImg), fit: BoxFit.cover) : null,
-                                  ),
-                                  child: Stack(
-                                    children: [
-                                      if (auth.isTeacher)
-                                        Positioned(
-                                          top: 8, left: 8,
-                                          child: GestureDetector(
-                                            onTap: () {
-                                              final code = _codeFor(id);
-                                              Clipboard.setData(ClipboardData(text: code));
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                SnackBar(content: Text('Код скопирован: $code'), backgroundColor: AppColors.teal),
-                                              );
-                                            },
-                                            child: Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                              decoration: BoxDecoration(
-                                                color: Colors.black54,
-                                                borderRadius: BorderRadius.circular(6),
-                                              ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
+                                ClipRRect(
+                                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                                  child: Container(
+                                    height: 140,
+                                    decoration: BoxDecoration(
+                                      gradient: coverImg == null ? LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight) : null,
+                                      image: coverImg != null && !coverImg.toString().startsWith('data:') ? DecorationImage(image: NetworkImage(coverImg), fit: BoxFit.cover) : null,
+                                    ),
+                                    child: Stack(
+                                      fit: StackFit.expand,
+                                      children: [
+                                        // Base64 image
+                                        if (coverImg != null && coverImg.toString().startsWith('data:'))
+                                          Builder(builder: (ctx) {
+                                            try {
+                                              final b64 = coverImg.toString().split(',').last;
+                                              return Image.memory(base64Decode(b64), fit: BoxFit.cover, width: double.infinity, height: double.infinity, errorBuilder: (_, __, ___) => SizedBox());
+                                            } catch (_) { return SizedBox(); }
+                                          }),
+                                        // Code chip for teachers
+                                        if (auth.isTeacher)
+                                          Positioned(
+                                            top: 8, left: 8,
+                                            child: GestureDetector(
+                                              onTap: () {
+                                                final code = _codeFor(id);
+                                                Clipboard.setData(ClipboardData(text: code));
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  SnackBar(content: Text('Код скопирован: $code'), backgroundColor: AppColors.teal),
+                                                );
+                                              },
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(6)),
+                                                child: Row(mainAxisSize: MainAxisSize.min, children: [
                                                   const Icon(Icons.copy, color: Colors.white70, size: 12),
                                                   const SizedBox(width: 4),
                                                   Text(_codeFor(id), style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 2)),
-                                                ],
+                                                ]),
                                               ),
                                             ),
                                           ),
-                                        ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ),
                                 // Body

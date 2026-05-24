@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/theme_provider.dart';
 import '../../theme/app_theme.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -37,7 +38,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             // Profile card
             Container(
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border)),
+              decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.3))),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -69,7 +70,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    decoration: BoxDecoration(color: AppColors.surface2, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
+                    decoration: BoxDecoration(color: AppColors.surface2, borderRadius: BorderRadius.circular(12), border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.3))),
                     child: Row(
                       children: [
                         Text(_roleLabel(auth.role), style: const TextStyle(fontSize: 14, color: AppColors.text2)),
@@ -85,7 +86,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      decoration: BoxDecoration(color: AppColors.surface2, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
+                      decoration: BoxDecoration(color: AppColors.surface2, borderRadius: BorderRadius.circular(12), border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.3))),
                       child: Row(
                         children: [
                           Text(auth.group, style: const TextStyle(fontSize: 14, color: AppColors.text2)),
@@ -111,10 +112,66 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 16),
 
+            // Theme toggle
+            Builder(builder: (ctx) {
+              final themeProv = context.watch<ThemeProvider>();
+              final isDark = themeProv.isDark;
+              return Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.3))),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Icon(Icons.palette, color: AppColors.teal, size: 18),
+                    SizedBox(width: 8),
+                    Text('Оформление', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  ]),
+                  SizedBox(height: 16),
+                  Row(children: [
+                    Expanded(child: GestureDetector(
+                      onTap: () { if (isDark) themeProv.toggle(); },
+                      child: Container(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          color: !isDark ? AppColors.tealLt : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: !isDark ? AppColors.teal : Theme.of(context).dividerColor, width: !isDark ? 2 : 1),
+                        ),
+                        child: Column(children: [
+                          Container(width: 40, height: 40, decoration: BoxDecoration(color: Color(0xFFF0F4F5), borderRadius: BorderRadius.circular(10), border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.3))),
+                            child: Icon(Icons.light_mode, color: Color(0xFF0D2D33), size: 20)),
+                          SizedBox(height: 8),
+                          Text('Светлая', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: !isDark ? AppColors.teal : Theme.of(context).textTheme.bodyMedium?.color)),
+                        ]),
+                      ),
+                    )),
+                    SizedBox(width: 12),
+                    Expanded(child: GestureDetector(
+                      onTap: () { if (!isDark) themeProv.toggle(); },
+                      child: Container(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          color: isDark ? AppColors.teal.withOpacity(0.15) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: isDark ? AppColors.teal : Theme.of(context).dividerColor, width: isDark ? 2 : 1),
+                        ),
+                        child: Column(children: [
+                          Container(width: 40, height: 40, decoration: BoxDecoration(color: Color(0xFF111B1E), borderRadius: BorderRadius.circular(10), border: Border.all(color: Color(0xFF1E3040))),
+                            child: Icon(Icons.dark_mode, color: Color(0xFFE8F4F6), size: 20)),
+                          SizedBox(height: 8),
+                          Text('Тёмная', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? AppColors.teal : Theme.of(context).textTheme.bodyMedium?.color)),
+                        ]),
+                      ),
+                    )),
+                  ]),
+                ]),
+              );
+            }),
+            const SizedBox(height: 16),
+
             // Preferences
             Container(
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border)),
+              decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.3))),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -136,7 +193,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             // Logout
             Container(
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border)),
+              decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.3))),
               child: ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                 leading: Container(

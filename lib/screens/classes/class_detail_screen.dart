@@ -6,583 +6,464 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/toast.dart';
 
 class ClassDetailScreen extends StatefulWidget {
   final int classId;
   const ClassDetailScreen({super.key, required this.classId});
-  @override
-  State<ClassDetailScreen> createState() => _ClassDetailScreenState();
+  @override State<ClassDetailScreen> createState() => _ClassDetailState();
 }
 
-class _ClassDetailScreenState extends State<ClassDetailScreen> with SingleTickerProviderStateMixin {
+class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProviderStateMixin {
   late TabController _tabCtrl;
   List<dynamic> _posts = [];
   List<dynamic> _assignments = [];
-  bool _loading = true;
-  bool _loadingAssignments = false;
+  List<dynamic> _mySubs = [];
   Map<String, dynamic> _rating = {};
+  bool _loading = true, _loadingAsg = false;
 
   @override
-  void initState() {
-    super.initState();
-    _tabCtrl = TabController(length: 4, vsync: this);
-    _tabCtrl.addListener(() {
-      if (_tabCtrl.index == 2 && _assignments.isEmpty) _loadAssignments();
-    });
-    _load();
-  }
+  void initState() { super.initState(); _tabCtrl = TabController(length: 4, vsync: this); _tabCtrl.addListener(() { if (_tabCtrl.index == 2 && _assignments.isEmpty) _loadAssignments(); }); _load(); }
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    try {
-      final api = context.read<ApiService>();
-      _posts = await api.getPosts();
-      if (!context.read<AuthProvider>().isTeacher) {
-        try { _rating = await api.getMyRating(classId: widget.classId); } catch (_) {}
-      }
-    } catch (_) {}
+    final api = context.read<ApiService>();
+    try { _posts = await api.getPosts(); } catch (_) {}
+    if (!context.read<AuthProvider>().isTeacher) {
+      try { _rating = await api.getMyRating(classId: widget.classId); } catch (_) {}
+    }
     setState(() => _loading = false);
   }
 
   Future<void> _loadAssignments() async {
-    setState(() => _loadingAssignments = true);
+    setState(() => _loadingAsg = true);
+    final api = context.read<ApiService>();
     try {
-      final api = context.read<ApiService>();
       _assignments = await api.getAssignments(classId: widget.classId);
+      if (!context.read<AuthProvider>().isTeacher) {
+        try { _mySubs = await api.getMySubmissions(); } catch (_) {}
+      }
     } catch (_) {}
-    setState(() => _loadingAssignments = false);
+    setState(() => _loadingAsg = false);
   }
 
-  Map<String, dynamic> get _classMeta {
-    final post = _posts.firstWhere(
-      (p) {
-        if (p['id'] != widget.classId) return false;
-        try { final b = jsonDecode(p['body']); return b['type'] == 'class'; } catch (_) { return false; }
-      },
-      orElse: () => null,
-    );
-    if (post == null) return {};
-    try { return jsonDecode(post['body']); } catch (_) { return {}; }
+  Map<String, dynamic> get _meta {
+    final p = _posts.firstWhere((p) => p['id'] == widget.classId && (() { try { return jsonDecode(p['body'])['type'] == 'class'; } catch (_) { return false; } })(), orElse: () => null);
+    if (p == null) return {};
+    try { return jsonDecode(p['body']); } catch (_) { return {}; }
   }
-
-  String get _classTitle {
-    final post = _posts.firstWhere((p) => p['id'] == widget.classId, orElse: () => null);
-    return post?['title'] ?? 'Класс #${widget.classId}';
-  }
-
+  String get _title => _posts.firstWhere((p) => p['id'] == widget.classId, orElse: () => {'title': 'Класс #${widget.classId}'})?['title'] ?? '';
   List<dynamic> get _lectures => _posts.where((p) => (p['title'] ?? '').startsWith('[LECTURE][${widget.classId}]')).toList();
   List<dynamic> get _materials => _posts.where((p) => (p['title'] ?? '').startsWith('[HW][${widget.classId}]')).toList();
-
-  String _cleanTitle(String t) => t.replaceFirst(RegExp(r'^\[(LECTURE|HW)\]\[\d+\]\s*'), '').trim();
-
-  String _getPreview(dynamic p) {
-    try {
-      final b = jsonDecode(p['body']);
-      final content = b['content'] ?? b['description'] ?? '';
-      final clean = content.replaceAll(RegExp(r'https?://\S+'), '').replaceAll(RegExp(r'\s+'), ' ').trim();
-      return clean.length > 100 ? '${clean.substring(0, 100)}…' : clean.isEmpty ? 'Нет описания' : clean;
-    } catch (_) { return 'Нет описания'; }
-  }
-
-  String _codeFor(int id) {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    var code = '';
-    var n = id * 1337 + 42;
-    for (var i = 0; i < 6; i++) { code += chars[n % chars.length]; n = n ~/ chars.length + id * 7; }
-    return code.substring(0, 6);
-  }
+  String _clean(String t) => t.replaceFirst(RegExp(r'^\[(LECTURE|HW)\]\[\d+\]\s*'), '').trim();
+  String _preview(dynamic p) { try { final b = jsonDecode(p['body']); return (b['content'] ?? b['description'] ?? '').replaceAll(RegExp(r'https?://\S+'), '').replaceAll(RegExp(r'\s+'), ' ').trim(); } catch (_) { return ''; } }
+  String _fmtDate(String? d) { if (d == null) return ''; try { final dt = DateTime.parse(d); return '${dt.day}.${dt.month.toString().padLeft(2, '0')}.${dt.year}'; } catch (_) { return d; } }
+  String _code(int id) { const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; var s = ''; var n = id * 1337 + 42; for (var i = 0; i < 6; i++) { s += c[n % c.length]; n = n ~/ c.length + id * 7; } return s.substring(0, 6); }
+  dynamic _subFor(int aId) => _mySubs.firstWhere((s) => s['assignment_id'] == aId, orElse: () => null);
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final meta = _classMeta;
+    final meta = _meta;
     final coverImg = meta['cover_image'];
-    final colors = [const Color(0xFF006475), const Color(0xFF009AAF)];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surfaceColor = Theme.of(context).colorScheme.surface;
+
+    if (_loading) return Scaffold(body: Center(child: CircularProgressIndicator(color: C.teal)));
 
     return Scaffold(
-      body: _loading
-        ? const Center(child: CircularProgressIndicator(color: AppColors.teal))
-        : NestedScrollView(
-            headerSliverBuilder: (context, _) => [
-              SliverAppBar(
-                expandedHeight: 180,
-                pinned: true,
-                backgroundColor: AppColors.teal,
-                leading: IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () => Navigator.pop(context),
-                ),
-                actions: [
-                  IconButton(
-                    icon: const Icon(Icons.copy, color: Colors.white70, size: 20),
-                    onPressed: () {
-                      final code = _codeFor(widget.classId);
-                      Clipboard.setData(ClipboardData(text: code));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Код: $code'), backgroundColor: AppColors.teal),
-                      );
-                    },
-                  ),
-                ],
-                flexibleSpace: FlexibleSpaceBar(
-                  title: Text(_classTitle, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                  background: Container(
-                    decoration: BoxDecoration(
-                      gradient: coverImg == null ? LinearGradient(colors: colors) : null,
-                      image: coverImg != null ? DecorationImage(image: NetworkImage(coverImg), fit: BoxFit.cover) : null,
-                    ),
-                    child: coverImg != null ? Container(color: Colors.black38) : null,
-                  ),
-                ),
-              ),
+      body: NestedScrollView(
+        headerSliverBuilder: (ctx, _) => [
+          SliverAppBar(expandedHeight: 200, pinned: true, backgroundColor: C.teal,
+            leading: IconButton(icon: Icon(Icons.arrow_back, color: Colors.white), onPressed: () => Navigator.pop(context)),
+            actions: [
+              IconButton(icon: Icon(Icons.copy, color: Colors.white70, size: 20), onPressed: () {
+                final code = _code(widget.classId);
+                Clipboard.setData(ClipboardData(text: code));
+                showToast(context, 'Код: $code');
+              }),
+              if (auth.isTeacher) IconButton(icon: Icon(Icons.edit, color: Colors.white70, size: 20), onPressed: () => _editClass()),
             ],
-            body: Column(
-              children: [
-                // Tabs
-                Container(
-                  color: Theme.of(context).colorScheme.surface,
-                  child: TabBar(
-                    controller: _tabCtrl,
-                    labelColor: AppColors.teal,
-                    unselectedLabelColor: AppColors.text4,
-                    indicatorColor: AppColors.teal,
-                    labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                    tabs: [
-                      Tab(text: 'Лекции (${_lectures.length})'),
-                      Tab(text: 'Материалы (${_materials.length})'),
-                      Tab(text: 'Задания (${_assignments.length})'),
-                      const Tab(text: '✨ AI'),
-                    ],
-                  ),
-                ),
-                // Student rating
-                if (!auth.isTeacher && _rating.isNotEmpty)
-                  Container(
-                    margin: const EdgeInsets.all(12),
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(colors: [Color(0xFF007A8E), AppColors.teal]),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Row(
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Ваш рейтинг', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 4),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text('${(_rating['avg_score'] ?? 0).round()}', style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900)),
-                                const Padding(padding: EdgeInsets.only(bottom: 4), child: Text('/100', style: TextStyle(color: Colors.white60, fontSize: 14))),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const Spacer(),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text('${(_rating['avg_percent'] ?? 0).round()}%', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
-                            Text('${_rating['graded_count'] ?? 0} оценено', style: const TextStyle(color: Colors.white60, fontSize: 11)),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabCtrl,
-                    children: [
-                      _buildPostsList(_lectures, 'lecture'),
-                      _buildPostsList(_materials, 'material'),
-                      _buildAssignmentsList(),
-                      _buildAiChat(),
-                    ],
-                  ),
-                ),
-              ],
+            flexibleSpace: FlexibleSpaceBar(
+              background: Stack(fit: StackFit.expand, children: [
+                if (coverImg == null) Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF006475), C.teal]))),
+                if (coverImg != null && !coverImg.toString().startsWith('data:'))
+                  Image.network(coverImg, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: C.teal)),
+                if (coverImg != null && coverImg.toString().startsWith('data:'))
+                  Builder(builder: (_) { try { return Image.memory(base64Decode(coverImg.toString().split(',').last), fit: BoxFit.cover); } catch (_) { return Container(color: C.teal); } }),
+                Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black26, Colors.black54]))),
+                Positioned(bottom: 50, left: 16, right: 16, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(_title, style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)),
+                  if (meta['description'] != null && meta['description'].toString().isNotEmpty)
+                    Padding(padding: EdgeInsets.only(top: 4), child: Text(meta['description'], style: TextStyle(color: Colors.white70, fontSize: 13))),
+                  SizedBox(height: 8),
+                  GestureDetector(onTap: () { Clipboard.setData(ClipboardData(text: _code(widget.classId))); showToast(context, 'Код скопирован'); },
+                    child: Container(padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6), decoration: BoxDecoration(color: C.tealLt.withOpacity(0.9), borderRadius: BorderRadius.circular(8)),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.copy, size: 14, color: C.teal), SizedBox(width: 6), Text('Код: ', style: TextStyle(fontSize: 13, color: C.teal)), Text(_code(widget.classId), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: C.teal, letterSpacing: 2))]))),
+                ])),
+              ]),
             ),
           ),
-      floatingActionButton: auth.isTeacher ? FloatingActionButton(
-        backgroundColor: AppColors.teal,
-        onPressed: () => _showCreatePostDialog(),
-        child: const Icon(Icons.add, color: Colors.white),
-      ) : null,
+        ],
+        body: Column(children: [
+          Container(color: surfaceColor, child: TabBar(controller: _tabCtrl, labelColor: C.teal, unselectedLabelColor: C.text4, indicatorColor: C.teal, labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            tabs: [Tab(text: 'Лекции (${_lectures.length})'), Tab(text: 'Материалы (${_materials.length})'), Tab(text: 'Задания'), Tab(text: '✨ AI')])),
+          Expanded(child: TabBarView(controller: _tabCtrl, children: [
+            _postList(_lectures, 'lecture'),
+            _postList(_materials, 'material'),
+            _assignmentsTab(auth),
+            _aiTab(),
+          ])),
+        ]),
+      ),
+      floatingActionButton: auth.isTeacher ? FloatingActionButton(backgroundColor: C.teal, child: Icon(Icons.add, color: Colors.white),
+        onPressed: () => _showAddMenu()) : null,
     );
   }
 
-  Widget _buildPostsList(List<dynamic> posts, String type) {
-    if (posts.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(type == 'lecture' ? '📖' : '📦', style: const TextStyle(fontSize: 40)),
-            const SizedBox(height: 12),
-            Text(type == 'lecture' ? 'Нет лекций' : 'Нет материалов', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.text3)),
-          ],
-        ),
-      );
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.all(12),
-      itemCount: posts.length,
-      itemBuilder: (context, i) {
-        final p = posts[i];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 10),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            leading: Container(
-              width: 42, height: 42,
-              decoration: BoxDecoration(
-                color: type == 'lecture' ? AppColors.tealLight : const Color(0xFFFFF7ED),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                type == 'lecture' ? Icons.menu_book : Icons.description,
-                color: type == 'lecture' ? AppColors.teal : AppColors.yellow,
-                size: 20,
-              ),
-            ),
-            title: Text(_cleanTitle(p['title'] ?? ''), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700), maxLines: 2, overflow: TextOverflow.ellipsis),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(_getPreview(p), style: const TextStyle(fontSize: 12, color: AppColors.text4), maxLines: 2, overflow: TextOverflow.ellipsis),
-            ),
-            trailing: const Icon(Icons.chevron_right, color: AppColors.text4),
-            onTap: () => _showPostDetail(p, type),
-          ),
-        );
-      },
-    );
+  // ── Posts list ──
+  Widget _postList(List<dynamic> posts, String type) {
+    final surfaceColor = Theme.of(context).colorScheme.surface;
+    if (posts.isEmpty) return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+      Text(type == 'lecture' ? '📖' : '📦', style: TextStyle(fontSize: 40)),
+      SizedBox(height: 12), Text(type == 'lecture' ? 'Нет лекций' : 'Нет материалов', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: C.text3)),
+    ]));
+    return ListView.builder(padding: EdgeInsets.all(12), itemCount: posts.length, itemBuilder: (ctx, i) {
+      final p = posts[i]; final body = _preview(p);
+      final files = _extractFiles(p);
+      return Container(margin: EdgeInsets.only(bottom: 10), decoration: BoxDecoration(color: surfaceColor, borderRadius: BorderRadius.circular(14), border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.3))),
+        child: InkWell(borderRadius: BorderRadius.circular(14), onTap: () => _showPost(p, type), child: Padding(padding: EdgeInsets.all(14), child: Row(children: [
+          Container(width: 42, height: 42, decoration: BoxDecoration(color: type == 'lecture' ? C.tealLt : Color(0xFFFFF7ED), borderRadius: BorderRadius.circular(12)),
+            child: Icon(type == 'lecture' ? Icons.menu_book : Icons.description, color: type == 'lecture' ? C.teal : C.yellow, size: 20)),
+          SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(_clean(p['title'] ?? ''), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700), maxLines: 2, overflow: TextOverflow.ellipsis),
+            if (body.isNotEmpty) Padding(padding: EdgeInsets.only(top: 4), child: Text(body, style: TextStyle(fontSize: 12, color: C.text4), maxLines: 1, overflow: TextOverflow.ellipsis)),
+            SizedBox(height: 4),
+            Row(children: [
+              Icon(Icons.calendar_today, size: 11, color: C.text4), SizedBox(width: 4),
+              Text(_fmtDate(p['created_at'] ?? ''), style: TextStyle(fontSize: 11, color: C.text4)),
+              if (files.isNotEmpty) ...[SizedBox(width: 10), Icon(Icons.attach_file, size: 11, color: C.text4), SizedBox(width: 2), Text('${files.length} файл', style: TextStyle(fontSize: 11, color: C.text4))],
+            ]),
+          ])),
+          Icon(Icons.chevron_right, color: C.text4, size: 20),
+        ]))));
+    });
   }
 
-  Widget _buildAssignmentsList() {
-    if (_loadingAssignments) return const Center(child: CircularProgressIndicator(color: AppColors.teal));
-    if (_assignments.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [Text('📋', style: TextStyle(fontSize: 40)), SizedBox(height: 12), Text('Нет заданий', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.text3))],
-        ),
-      );
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.all(12),
-      itemCount: _assignments.length,
-      itemBuilder: (context, i) {
-        final a = _assignments[i];
+  List<String> _extractFiles(dynamic p) {
+    final body = p['body'] ?? '';
+    final matches = RegExp(r'https?://[^\s"<>]+\.(pdf|doc|docx|txt|png|jpg|jpeg|pptx?|xlsx?)', caseSensitive: false).allMatches(body);
+    return matches.map((m) => m.group(0)!).toList();
+  }
+
+  // ── Assignments tab ──
+  Widget _assignmentsTab(AuthProvider auth) {
+    if (_loadingAsg) return Center(child: CircularProgressIndicator(color: C.teal));
+    final surfaceColor = Theme.of(context).colorScheme.surface;
+    return ListView(padding: EdgeInsets.all(12), children: [
+      // Rating card (students)
+      if (!auth.isTeacher && _rating.isNotEmpty) Container(
+        margin: EdgeInsets.only(bottom: 16), padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF007A8E), C.teal]), borderRadius: BorderRadius.circular(16)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('YOUR RATING', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1)),
+          SizedBox(height: 6),
+          Row(children: [
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('PERFORMANCE', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1)),
+              SizedBox(height: 6),
+              ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: (_rating['avg_percent'] ?? 0) / 100, backgroundColor: Colors.white24, color: Colors.white, minHeight: 6)),
+            ])),
+            SizedBox(width: 16),
+            RichText(text: TextSpan(children: [
+              TextSpan(text: '${(_rating['avg_score'] ?? 0).round()}', style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900)),
+              TextSpan(text: '/100', style: TextStyle(color: Colors.white60, fontSize: 14)),
+            ])),
+          ]),
+          SizedBox(height: 4),
+          Align(alignment: Alignment.centerRight, child: Text('${(_rating['avg_percent'] ?? 0).round()}%', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700))),
+        ]),
+      ),
+      // Header
+      Row(children: [
+        Text('Lab Work', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+        Spacer(),
+        Row(children: [Icon(Icons.sort, size: 14, color: C.text4), SizedBox(width: 4), Text('SORT: BY DEADLINE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: C.text4, letterSpacing: 0.5))]),
+      ]),
+      SizedBox(height: 12),
+      if (_assignments.isEmpty) Container(padding: EdgeInsets.all(40), child: Center(child: Column(children: [
+        Text('📋', style: TextStyle(fontSize: 40)), SizedBox(height: 8),
+        Text('Нет заданий', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: C.text3)),
+      ]))),
+      // Assignment cards
+      ..._assignments.map((a) {
+        final sub = _subFor(a['id']);
+        final status = sub?['status'];
+        final grade = sub?['grade'];
+        final isGraded = status == 'graded';
+        final isSubmitted = status == 'submitted';
         final deadline = a['deadline'];
-        final isLate = deadline != null && DateTime.tryParse(deadline)?.isBefore(DateTime.now()) == true;
-        return Card(
-          margin: const EdgeInsets.only(bottom: 10),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            leading: Container(
-              width: 42, height: 42,
-              decoration: BoxDecoration(
-                color: isLate ? AppColors.redLight : AppColors.tealLight,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(isLate ? Icons.warning : Icons.assignment, color: isLate ? AppColors.red : AppColors.teal, size: 20),
-            ),
-            title: Text(a['title'] ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (a['description'] != null) Text(a['description'], style: const TextStyle(fontSize: 12, color: AppColors.text4), maxLines: 1),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    if (deadline != null) ...[
-                      Icon(Icons.calendar_today, size: 12, color: isLate ? AppColors.red : AppColors.text4),
-                      const SizedBox(width: 4),
-                      Text(_fmtDate(deadline), style: TextStyle(fontSize: 11, color: isLate ? AppColors.red : AppColors.text4, fontWeight: FontWeight.w500)),
-                      const SizedBox(width: 12),
-                    ],
-                    const Icon(Icons.star, size: 12, color: AppColors.teal),
-                    const SizedBox(width: 4),
-                    Text('${a['max_score'] ?? 0} баллов', style: const TextStyle(fontSize: 11, color: AppColors.teal, fontWeight: FontWeight.w600)),
-                  ],
-                ),
-              ],
-            ),
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: isLate ? AppColors.redLight : AppColors.surface2,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: isLate ? AppColors.red.withOpacity(0.3) : AppColors.border),
-              ),
-              child: Text(isLate ? 'ПРОСРОЧЕНО' : 'ОТКРЫТО', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: isLate ? AppColors.red : AppColors.text4)),
-            ),
-          ),
+        final isLate = deadline != null && DateTime.tryParse(deadline)?.isBefore(DateTime.now()) == true && sub == null;
+
+        return Container(
+          margin: EdgeInsets.only(bottom: 12), padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(color: surfaceColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.3))),
+          child: InkWell(onTap: () => _showAssignment(a, sub), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(width: 42, height: 42, decoration: BoxDecoration(
+              color: isGraded ? C.greenLt : isLate ? C.redLt : C.tealLt, borderRadius: BorderRadius.circular(12)),
+              child: Icon(isGraded ? Icons.check_circle : isLate ? Icons.warning : Icons.edit_note,
+                color: isGraded ? C.green : isLate ? C.red : C.teal, size: 20)),
+            SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Expanded(child: Text(a['title'] ?? '', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
+                SizedBox(width: 8),
+                Container(padding: EdgeInsets.symmetric(horizontal: 10, vertical: 3), decoration: BoxDecoration(
+                  color: isGraded ? C.greenLt : isSubmitted ? C.tealLt : isLate ? C.redLt : C.surface2, borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: isGraded ? C.green.withOpacity(0.3) : isLate ? C.red.withOpacity(0.3) : C.border)),
+                  child: Text(isGraded ? 'GRADED' : isSubmitted ? 'SUBMITTED' : isLate ? 'OVERDUE' : 'NEW', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: isGraded ? C.green : isSubmitted ? C.teal : isLate ? C.red : C.text4))),
+              ]),
+              if (a['description'] != null) Padding(padding: EdgeInsets.only(top: 4), child: Text(a['description'], style: TextStyle(fontSize: 13, color: C.text4), maxLines: 1, overflow: TextOverflow.ellipsis)),
+              SizedBox(height: 8),
+              Row(children: [
+                if (deadline != null) ...[Icon(Icons.calendar_today, size: 12, color: C.text4), SizedBox(width: 4), Text(_fmtDate(deadline), style: TextStyle(fontSize: 12, color: C.text4, fontWeight: FontWeight.w500)), SizedBox(width: 12)],
+                Icon(Icons.star_border, size: 14, color: C.teal), SizedBox(width: 4),
+                Text('${a['max_score'] ?? 100} PTS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: C.teal)),
+                if (grade != null) ...[SizedBox(width: 12), Text('Score: ${grade['score']}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: C.green))],
+              ]),
+              SizedBox(height: 6),
+              Align(alignment: Alignment.centerRight, child: Text('Preview assignment', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: C.teal))),
+            ])),
+          ])),
         );
-      },
-    );
+      }),
+    ]);
   }
 
-  Widget _buildAiChat() {
-    return _ClassAiChat(classId: widget.classId, className: _classTitle, posts: _posts.where((p) => (p['title'] ?? '').contains('[${widget.classId}]')).toList());
+  // ── AI Chat tab ──
+  Widget _aiTab() => _AiChat(classId: widget.classId, className: _title);
+
+  // ── Show post detail ──
+  void _showPost(dynamic p, String type) {
+    String content = ''; try { final b = jsonDecode(p['body']); content = b['content'] ?? b['description'] ?? ''; } catch (_) { content = p['body'] ?? ''; }
+    final files = _extractFiles(p);
+    showModalBottomSheet(context: context, isScrollControlled: true, shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => DraggableScrollableSheet(expand: false, initialChildSize: 0.7, maxChildSize: 0.95, builder: (ctx, sc) => ListView(controller: sc, padding: EdgeInsets.all(20), children: [
+        Center(child: Container(width: 40, height: 4, margin: EdgeInsets.only(bottom: 16), decoration: BoxDecoration(color: C.border, borderRadius: BorderRadius.circular(2)))),
+        Text(_clean(p['title'] ?? ''), style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+        SizedBox(height: 6), Text(_fmtDate(p['created_at'] ?? ''), style: TextStyle(fontSize: 12, color: C.text4)),
+        SizedBox(height: 16), Text(content, style: TextStyle(fontSize: 14, height: 1.7)),
+        if (files.isNotEmpty) ...[SizedBox(height: 16), Text('Файлы:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: C.text3)), SizedBox(height: 8),
+          ...files.map((f) => GestureDetector(
+            onTap: () async {
+              final uri = Uri.parse(f);
+              if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+            },
+            child: Container(margin: EdgeInsets.only(bottom: 6), padding: EdgeInsets.all(12), decoration: BoxDecoration(color: C.tealLt, borderRadius: BorderRadius.circular(10)),
+              child: Row(children: [Icon(Icons.attach_file, size: 16, color: C.teal), SizedBox(width: 8), Expanded(child: Text(Uri.parse(f).pathSegments.last, style: TextStyle(fontSize: 13, color: C.teal, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)), Icon(Icons.open_in_new, size: 14, color: C.teal)])))),
+        ],
+      ])));
   }
 
-  String _fmtDate(String? d) {
-    if (d == null) return '';
+  // ── Show assignment detail ──
+  void _showAssignment(dynamic a, dynamic sub) {
+    final tc = TextEditingController(); bool busy = false;
+    final auth = context.read<AuthProvider>();
+    List<dynamic> criteria = []; try { criteria = jsonDecode(a['criteria'] ?? '[]'); } catch (_) {}
+    showModalBottomSheet(context: context, isScrollControlled: true, shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => DraggableScrollableSheet(expand: false, initialChildSize: 0.8, maxChildSize: 0.95, builder: (ctx, sc) => ListView(controller: sc, padding: EdgeInsets.all(20), children: [
+        Center(child: Container(width: 40, height: 4, margin: EdgeInsets.only(bottom: 16), decoration: BoxDecoration(color: C.border, borderRadius: BorderRadius.circular(2)))),
+        Text(a['title'] ?? '', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+        SizedBox(height: 8),
+        Wrap(spacing: 8, children: [
+          _chip(Icons.star, '${a['max_score'] ?? 100} баллов', C.teal, C.tealLt),
+          if (a['deadline'] != null) _chip(Icons.calendar_today, _fmtDate(a['deadline']), C.text4, C.surface2),
+        ]),
+        if (a['description'] != null) ...[SizedBox(height: 16), Text(a['description'], style: TextStyle(fontSize: 14, height: 1.6))],
+        if (criteria.isNotEmpty) ...[SizedBox(height: 16), Text('Критерии оценивания', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: C.text3)), SizedBox(height: 8),
+          ...criteria.map((c) => Container(margin: EdgeInsets.only(bottom: 8), padding: EdgeInsets.all(12), decoration: BoxDecoration(color: C.surface2, borderRadius: BorderRadius.circular(10)),
+            child: Row(children: [Expanded(child: Text(c['name'] ?? '', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+              Container(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: C.tealLt, borderRadius: BorderRadius.circular(8)),
+                child: Text('${c['weight'] ?? 0}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: C.teal)))])))],
+        // Grade result
+        if (sub?['grade'] != null) ...[SizedBox(height: 16), Container(padding: EdgeInsets.all(14), decoration: BoxDecoration(color: C.greenLt, borderRadius: BorderRadius.circular(12)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [Icon(Icons.check_circle, size: 18, color: C.green), SizedBox(width: 8), Text('Оценка: ${sub['grade']['score']}/${a['max_score']}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: C.green))]),
+            if (sub['grade']['feedback'] != null) Padding(padding: EdgeInsets.only(top: 8), child: Text(sub['grade']['feedback'], style: TextStyle(fontSize: 13, color: C.text1, height: 1.5))),
+          ]))],
+        // Submit (students, not yet submitted)
+        if (!auth.isTeacher && sub == null) ...[SizedBox(height: 20), Divider(), SizedBox(height: 12),
+          Text('Отправить работу', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          SizedBox(height: 10), TextField(controller: tc, maxLines: 5, decoration: InputDecoration(hintText: 'Текст работы или ссылка...')),
+          SizedBox(height: 12), SizedBox(width: double.infinity, height: 48, child: ElevatedButton(
+            onPressed: busy ? null : () async {
+              if (tc.text.trim().isEmpty) return;
+              setS(() => busy = true);
+              try { await context.read<ApiService>().submitAssignment(a['id'], {'text_content': tc.text.trim()}); Navigator.pop(ctx); showToast(context, 'Работа отправлена!'); _loadAssignments(); }
+              catch (_) { showToast(context, 'Ошибка отправки', error: true); }
+              setS(() => busy = false);
+            },
+            child: busy ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Text('Отправить')))],
+        // Teacher: view submissions
+        if (auth.isTeacher) ...[SizedBox(height: 16), SizedBox(width: double.infinity, height: 48, child: ElevatedButton.icon(icon: Icon(Icons.list_alt, size: 18), label: Text('Просмотр работ'), onPressed: () => _viewSubs(a['id'])))],
+        SizedBox(height: 24),
+      ]))));
+  }
+
+  Widget _chip(IconData ic, String text, Color fg, Color bg) => Container(
+    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(ic, size: 14, color: fg), SizedBox(width: 4), Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: fg))]));
+
+  void _viewSubs(int aId) async {
     try {
-      final dt = DateTime.parse(d);
-      return '${dt.day}.${dt.month.toString().padLeft(2, '0')}.${dt.year}';
-    } catch (_) { return d; }
+      final subs = await context.read<ApiService>().getSubmissions(aId);
+      if (!mounted) return;
+      showModalBottomSheet(context: context, isScrollControlled: true, shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        builder: (ctx) => DraggableScrollableSheet(expand: false, initialChildSize: 0.6, builder: (ctx, sc) => ListView(controller: sc, padding: EdgeInsets.all(20), children: [
+          Text('Работы (${subs.length})', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)), SizedBox(height: 12),
+          if (subs.isEmpty) Padding(padding: EdgeInsets.all(32), child: Center(child: Text('Пока нет работ', style: TextStyle(color: C.text4)))),
+          ...subs.map((s) => Container(margin: EdgeInsets.only(bottom: 10), padding: EdgeInsets.all(14), decoration: BoxDecoration(color: C.surface2, borderRadius: BorderRadius.circular(12)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [Icon(Icons.person, size: 16, color: C.teal), SizedBox(width: 6), Text(s['student_name'] ?? '#${s['student_id']}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)), Spacer(),
+                Container(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: s['status'] == 'graded' ? C.greenLt : C.tealLt, borderRadius: BorderRadius.circular(12)),
+                  child: Text(s['status'] ?? '', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: s['status'] == 'graded' ? C.green : C.teal)))]),
+              if (s['text_content'] != null) Padding(padding: EdgeInsets.only(top: 8), child: Text(s['text_content'], style: TextStyle(fontSize: 13), maxLines: 3, overflow: TextOverflow.ellipsis)),
+            ]))),
+        ])));
+    } catch (_) { showToast(context, 'Ошибка загрузки', error: true); }
   }
 
-  void _showPostDetail(dynamic post, String type) {
-    String content = '';
-    try { final b = jsonDecode(post['body']); content = b['content'] ?? b['description'] ?? post['body'] ?? ''; } catch (_) { content = post['body'] ?? ''; }
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.7,
-        maxChildSize: 0.95,
-        builder: (ctx, scroll) => ListView(
-          controller: scroll,
-          padding: const EdgeInsets.all(20),
-          children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-              decoration: BoxDecoration(
-                color: type == 'lecture' ? AppColors.tealLight : const Color(0xFFFFF7ED),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(type == 'lecture' ? Icons.menu_book : Icons.description, size: 14, color: type == 'lecture' ? AppColors.teal : AppColors.yellow),
-                  const SizedBox(width: 6),
-                  Text(type == 'lecture' ? 'Лекция' : 'Материал', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: type == 'lecture' ? AppColors.teal : AppColors.yellow)),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(_cleanTitle(post['title'] ?? ''), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 6),
-            Text(_fmtDate(post['created_at'] ?? ''), style: const TextStyle(fontSize: 12, color: AppColors.text4)),
-            const SizedBox(height: 16),
-            Text(content, style: const TextStyle(fontSize: 14, color: AppColors.text2, height: 1.7)),
-          ],
-        ),
-      ),
-    );
+  // ── FAB menu ──
+  void _showAddMenu() {
+    showModalBottomSheet(context: context, shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        SizedBox(height: 8), Container(width: 40, height: 4, decoration: BoxDecoration(color: C.border, borderRadius: BorderRadius.circular(2))),
+        ListTile(leading: Icon(Icons.menu_book, color: C.teal), title: Text('Добавить лекцию'), onTap: () { Navigator.pop(ctx); _createPost('lecture'); }),
+        ListTile(leading: Icon(Icons.description, color: C.yellow), title: Text('Добавить материал'), onTap: () { Navigator.pop(ctx); _createPost('material'); }),
+        ListTile(leading: Icon(Icons.assignment, color: C.green), title: Text('Создать задание'), onTap: () { Navigator.pop(ctx); _createAssignment(); }),
+        SizedBox(height: 16),
+      ])));
   }
 
-  void _showCreatePostDialog() {
-    final titleCtrl = TextEditingController();
-    final contentCtrl = TextEditingController();
-    String type = 'lecture';
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Добавить контент', style: TextStyle(fontWeight: FontWeight.w800)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    _typeChip('Лекция', 'lecture', type, (v) => setS(() => type = v)),
-                    const SizedBox(width: 8),
-                    _typeChip('Материал', 'material', type, (v) => setS(() => type = v)),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextField(controller: titleCtrl, decoration: const InputDecoration(hintText: 'Заголовок')),
-                const SizedBox(height: 12),
-                TextField(controller: contentCtrl, decoration: const InputDecoration(hintText: 'Содержимое'), maxLines: 5),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Отмена')),
-            ElevatedButton(
-              onPressed: () async {
-                if (titleCtrl.text.trim().isEmpty) return;
-                final prefix = type == 'lecture' ? '[LECTURE][${widget.classId}]' : '[HW][${widget.classId}]';
-                try {
-                  final api = context.read<ApiService>();
-                  await api.createPost('$prefix ${titleCtrl.text.trim()}', jsonEncode({'content': contentCtrl.text}));
-                  Navigator.pop(ctx);
-                  _load();
-                } catch (_) {}
-              },
-              child: const Text('Создать'),
-            ),
-          ],
-        ),
-      ),
-    );
+  void _createPost(String type) {
+    final tc = TextEditingController(), cc = TextEditingController();
+    showDialog(context: context, builder: (ctx) => AlertDialog(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Text(type == 'lecture' ? 'Новая лекция' : 'Новый материал', style: TextStyle(fontWeight: FontWeight.w800)),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: tc, decoration: InputDecoration(hintText: 'Заголовок')), SizedBox(height: 12),
+        TextField(controller: cc, decoration: InputDecoration(hintText: 'Содержимое, ссылки на файлы...'), maxLines: 5),
+      ]),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Отмена')),
+        ElevatedButton(onPressed: () async {
+          if (tc.text.trim().isEmpty) return;
+          final prefix = type == 'lecture' ? '[LECTURE][${widget.classId}]' : '[HW][${widget.classId}]';
+          try { await context.read<ApiService>().createPost('$prefix ${tc.text.trim()}', jsonEncode({'content': cc.text})); Navigator.pop(ctx); _load(); showToast(context, 'Создано'); }
+          catch (_) { showToast(context, 'Ошибка', error: true); }
+        }, child: Text('Создать'))],
+    ));
   }
 
-  Widget _typeChip(String label, String value, String selected, Function(String) onTap) {
-    final isSelected = selected == value;
-    return GestureDetector(
-      onTap: () => onTap(value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.teal : AppColors.surface2,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isSelected ? AppColors.teal : AppColors.border),
-        ),
-        child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isSelected ? Colors.white : AppColors.text3)),
-      ),
-    );
+  void _createAssignment() {
+    final tc = TextEditingController(), dc = TextEditingController(), sc = TextEditingController(text: '100');
+    DateTime? deadline;
+    showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => AlertDialog(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Text('Создать задание', style: TextStyle(fontWeight: FontWeight.w800)),
+      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: tc, decoration: InputDecoration(hintText: 'Название')), SizedBox(height: 12),
+        TextField(controller: dc, decoration: InputDecoration(hintText: 'Описание'), maxLines: 3), SizedBox(height: 12),
+        TextField(controller: sc, decoration: InputDecoration(hintText: 'Макс. балл'), keyboardType: TextInputType.number), SizedBox(height: 12),
+        ListTile(contentPadding: EdgeInsets.zero, leading: Icon(Icons.calendar_today, color: C.teal),
+          title: Text(deadline != null ? _fmtDate(deadline!.toIso8601String()) : 'Выбрать дедлайн', style: TextStyle(fontSize: 14)),
+          onTap: () async {
+            final d = await showDatePicker(context: ctx, initialDate: DateTime.now().add(Duration(days: 7)), firstDate: DateTime.now(), lastDate: DateTime.now().add(Duration(days: 365)));
+            if (d != null) setS(() => deadline = d);
+          }),
+      ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Отмена')),
+        ElevatedButton(onPressed: () async {
+          if (tc.text.trim().isEmpty) return;
+          try { await context.read<ApiService>().createAssignment({
+            'class_id': widget.classId, 'title': tc.text.trim(), 'description': dc.text.trim(),
+            'max_score': int.tryParse(sc.text) ?? 100, 'criteria': [{'name': 'Общая оценка', 'weight': int.tryParse(sc.text) ?? 100}],
+            if (deadline != null) 'deadline': deadline!.toIso8601String(),
+          }); Navigator.pop(ctx); _loadAssignments(); showToast(context, 'Задание создано'); }
+          catch (_) { showToast(context, 'Ошибка', error: true); }
+        }, child: Text('Создать'))],
+    )));
   }
 
-  @override
-  void dispose() { _tabCtrl.dispose(); super.dispose(); }
+  void _editClass() {
+    final meta = _meta;
+    final tc = TextEditingController(text: _title), dc = TextEditingController(text: meta['description'] ?? ''), tn = TextEditingController(text: meta['teacher_name'] ?? '');
+    showDialog(context: context, builder: (ctx) => AlertDialog(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Text('Редактировать класс', style: TextStyle(fontWeight: FontWeight.w800)),
+      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: tc, decoration: InputDecoration(labelText: 'Название')), SizedBox(height: 12),
+        TextField(controller: dc, decoration: InputDecoration(labelText: 'Описание'), maxLines: 3), SizedBox(height: 12),
+        TextField(controller: tn, decoration: InputDecoration(labelText: 'Имя учителя')),
+      ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Отмена')),
+        ElevatedButton(onPressed: () async {
+          try {
+            final post = _posts.firstWhere((p) => p['id'] == widget.classId);
+            var body = <String, dynamic>{}; try { body = jsonDecode(post['body']); } catch (_) {}
+            body['type'] = 'class'; body['description'] = dc.text.trim(); body['teacher_name'] = tn.text.trim();
+            await context.read<ApiService>().updatePost(widget.classId, tc.text.trim(), jsonEncode(body));
+            Navigator.pop(ctx); _load(); showToast(context, 'Класс обновлён');
+          } catch (_) { showToast(context, 'Ошибка', error: true); }
+        }, child: Text('Сохранить'))],
+    ));
+  }
+
+  @override void dispose() { _tabCtrl.dispose(); super.dispose(); }
 }
 
-// ── Class AI Chat ──
-class _ClassAiChat extends StatefulWidget {
-  final int classId;
-  final String className;
-  final List<dynamic> posts;
-  const _ClassAiChat({required this.classId, required this.className, required this.posts});
-  @override
-  State<_ClassAiChat> createState() => _ClassAiChatState();
+// ── AI Chat widget ──
+class _AiChat extends StatefulWidget {
+  final int classId; final String className;
+  const _AiChat({required this.classId, required this.className});
+  @override State<_AiChat> createState() => _AiChatState();
 }
-
-class _ClassAiChatState extends State<_ClassAiChat> {
-  final _msgCtrl = TextEditingController();
-  final _scrollCtrl = ScrollController();
+class _AiChatState extends State<_AiChat> {
+  final _ctrl = TextEditingController(), _scroll = ScrollController();
   final List<Map<String, String>> _msgs = [];
   bool _loading = false;
 
   void _send() async {
-    final text = _msgCtrl.text.trim();
-    if (text.isEmpty || _loading) return;
-    setState(() {
-      _msgs.add({'role': 'user', 'text': text});
-      _loading = true;
-    });
-    _msgCtrl.clear();
-    _scrollDown();
+    final text = _ctrl.text.trim(); if (text.isEmpty || _loading) return;
+    setState(() { _msgs.add({'role': 'user', 'text': text}); _loading = true; }); _ctrl.clear();
+    Future.delayed(Duration(milliseconds: 100), () { if (_scroll.hasClients) _scroll.animateTo(_scroll.position.maxScrollExtent, duration: Duration(milliseconds: 200), curve: Curves.easeOut); });
     try {
       final api = context.read<ApiService>();
-      final data = await api.aiChat(text, classId: widget.classId);
-      setState(() => _msgs.add({'role': 'assistant', 'text': data['response'] ?? data['message'] ?? 'Нет ответа'}));
-    } catch (e) {
-      setState(() => _msgs.add({'role': 'assistant', 'text': 'Ошибка: $e'}));
-    }
+      final apiMsgs = <Map<String, dynamic>>[
+        {'role': 'system', 'content': 'Ты AI-ассистент курса "${widget.className}". Отвечай на русском.'},
+        ..._msgs.map((m) => {'role': m['role']!, 'content': m['text']!}),
+      ];
+      final data = await api.aiChat(apiMsgs, classId: widget.classId);
+      setState(() => _msgs.add({'role': 'assistant', 'text': data['content'] ?? 'Нет ответа'}));
+    } catch (_) { setState(() => _msgs.add({'role': 'assistant', 'text': 'Ошибка соединения'})); }
     setState(() => _loading = false);
-    _scrollDown();
   }
 
-  void _scrollDown() {
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (_scrollCtrl.hasClients) _scrollCtrl.animateTo(_scrollCtrl.position.maxScrollExtent, duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Expanded(
-          child: _msgs.isEmpty
-            ? Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 60, height: 60,
-                      decoration: BoxDecoration(color: AppColors.tealLight, borderRadius: BorderRadius.circular(18)),
-                      child: const Icon(Icons.auto_awesome, color: AppColors.teal, size: 28),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text('AI Ассистент', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.text3)),
-                    const SizedBox(height: 4),
-                    const Text('Спросите о курсе', style: TextStyle(fontSize: 13, color: AppColors.text4)),
-                  ],
-                ),
-              )
-            : ListView.builder(
-                controller: _scrollCtrl,
-                padding: const EdgeInsets.all(12),
-                itemCount: _msgs.length + (_loading ? 1 : 0),
-                itemBuilder: (context, i) {
-                  if (i == _msgs.length) {
-                    return Align(
-                      alignment: Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.only(top: 8),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: AppColors.surface2, borderRadius: BorderRadius.circular(14)),
-                        child: const SizedBox(width: 40, height: 20, child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.teal))),
-                      ),
-                    );
-                  }
-                  final m = _msgs[i];
-                  final isUser = m['role'] == 'user';
-                  return Align(
-                    alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-                      decoration: BoxDecoration(
-                        color: isUser ? AppColors.teal : AppColors.surface2,
-                        borderRadius: BorderRadius.circular(14).copyWith(
-                          bottomRight: isUser ? const Radius.circular(4) : null,
-                          bottomLeft: !isUser ? const Radius.circular(4) : null,
-                        ),
-                      ),
-                      child: Text(m['text'] ?? '', style: TextStyle(fontSize: 14, color: isUser ? Colors.white : AppColors.text1, height: 1.5)),
-                    ),
-                  );
-                },
-              ),
-        ),
-        Container(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-          decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, border: Border(top: BorderSide(color: AppColors.border))),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _msgCtrl,
-                  decoration: InputDecoration(
-                    hintText: 'Спросите что-нибудь...',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: AppColors.border)),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  ),
-                  onSubmitted: (_) => _send(),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                width: 44, height: 44,
-                decoration: BoxDecoration(
-                  color: _msgCtrl.text.trim().isNotEmpty ? AppColors.teal : AppColors.surface2,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: IconButton(
-                  onPressed: _send,
-                  icon: Icon(Icons.send, color: _msgCtrl.text.trim().isNotEmpty ? Colors.white : AppColors.text4, size: 20),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
+  @override Widget build(BuildContext context) {
+    return Column(children: [
+      Expanded(child: _msgs.isEmpty
+        ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [Container(width: 60, height: 60, decoration: BoxDecoration(color: C.tealLt, borderRadius: BorderRadius.circular(18)), child: Icon(Icons.auto_awesome, color: C.teal, size: 28)), SizedBox(height: 12), Text('AI Ассистент', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: C.text3))]))
+        : ListView.builder(controller: _scroll, padding: EdgeInsets.all(12), itemCount: _msgs.length + (_loading ? 1 : 0), itemBuilder: (ctx, i) {
+            if (i == _msgs.length) return Align(alignment: Alignment.centerLeft, child: Container(margin: EdgeInsets.only(top: 8), padding: EdgeInsets.all(12), decoration: BoxDecoration(color: C.surface2, borderRadius: BorderRadius.circular(14)), child: SizedBox(width: 40, height: 20, child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: C.teal)))));
+            final m = _msgs[i]; final isU = m['role'] == 'user';
+            return Align(alignment: isU ? Alignment.centerRight : Alignment.centerLeft, child: Container(margin: EdgeInsets.only(bottom: 8), padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10), constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+              decoration: BoxDecoration(color: isU ? C.teal : C.surface2, borderRadius: BorderRadius.circular(14).copyWith(bottomRight: isU ? Radius.circular(4) : null, bottomLeft: !isU ? Radius.circular(4) : null)),
+              child: SelectableText(m['text'] ?? '', style: TextStyle(fontSize: 14, color: isU ? Colors.white : Theme.of(context).textTheme.bodyLarge?.color, height: 1.5))));
+          })),
+      Container(padding: EdgeInsets.fromLTRB(12, 8, 12, 12), decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, border: Border(top: BorderSide(color: Theme.of(context).dividerColor))),
+        child: Row(children: [
+          Expanded(child: TextField(controller: _ctrl, decoration: InputDecoration(hintText: 'Спросите...', border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: C.border)), contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10)), onSubmitted: (_) => _send())),
+          SizedBox(width: 8),
+          Container(width: 44, height: 44, decoration: BoxDecoration(color: C.teal, borderRadius: BorderRadius.circular(12)),
+            child: IconButton(onPressed: _send, icon: Icon(Icons.send, color: Colors.white, size: 20))),
+        ])),
+    ]);
   }
 }

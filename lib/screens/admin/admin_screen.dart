@@ -65,7 +65,7 @@ class _AdminScreenState extends State<AdminScreen> {
                 return Container(
                   margin: EdgeInsets.only(bottom: 8),
                   padding: EdgeInsets.all(14),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: C.border)),
+                  decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.3))),
                   child: Row(children: [
                     CircleAvatar(radius: 20, backgroundColor: _avatarColor(u['id'] ?? 0), child: Text((u['full_name'] ?? u['email'] ?? '?')[0].toUpperCase(), style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16))),
                     SizedBox(width: 12),
@@ -106,7 +106,7 @@ class _AdminScreenState extends State<AdminScreen> {
 
   Widget _stat(IconData icon, String val, String label) => Expanded(child: Container(
     padding: EdgeInsets.all(12),
-    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: C.border)),
+    decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.3))),
     child: Row(children: [Icon(icon, size: 18, color: C.teal), SizedBox(width: 8), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(val, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: C.text1)), Text(label, style: TextStyle(fontSize: 10, color: C.text4))])]),
   ));
 

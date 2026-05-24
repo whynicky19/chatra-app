@@ -149,7 +149,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
                     onPressed: _showNewGroupDialog,
                     icon: Container(
                       width: 36, height: 36,
-                      decoration: BoxDecoration(color: AppColors.surface2, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.border)),
+                      decoration: BoxDecoration(color: AppColors.surface2, borderRadius: BorderRadius.circular(10), border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.3))),
                       child: const Icon(Icons.add, size: 18, color: AppColors.text3),
                     ),
                   ),
@@ -173,7 +173,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
               Container(
                 constraints: const BoxConstraints(maxHeight: 200),
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8)]),
+                decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.3)), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8)]),
                 child: ListView(
                   shrinkWrap: true,
                   children: _searchResults.map((u) => ListTile(

@@ -41,7 +41,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final auth = context.read<AuthProvider>();
     final ok = await auth.register(_email.text.trim(), _pw.text, 'student', fullName: _name.text.trim(), group: _group);
     if (ok && mounted) { showToast(context, 'Регистрация успешна! Войдите в аккаунт'); Navigator.pushReplacementNamed(context, '/login'); }
-    else if (mounted) showToast(context, 'Ошибка регистрации', error: true);
+    else if (mounted) showToast(context, auth.lastError ?? 'Ошибка регистрации', error: true);
   }
 
   @override

@@ -69,8 +69,11 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  String? lastError;
+
   Future<bool> register(String email, String password, String role, {String? fullName, String? group}) async {
     _isLoading = true;
+    lastError = null;
     notifyListeners();
     try {
       await api.register(email, password, role, fullName: fullName, group: group);
@@ -79,6 +82,13 @@ class AuthProvider extends ChangeNotifier {
       return true;
     } catch (e) {
       _isLoading = false;
+      if (e.toString().contains('409')) {
+        lastError = 'Этот email уже зарегистрирован';
+      } else if (e.toString().contains('400')) {
+        lastError = 'Такой группы не существует';
+      } else {
+        lastError = 'Ошибка регистрации';
+      }
       notifyListeners();
       return false;
     }

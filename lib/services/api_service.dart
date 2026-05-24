@@ -63,7 +63,10 @@ class ApiService {
   // ── Auth ──
   Future<Map<String, dynamic>> login(String email, String password) async {
     final response = await _dio.post('/auth/login',
-      data: 'username=$email&password=$password',
+      data: {
+        'username': email,
+        'password': password,
+      },
       options: Options(contentType: 'application/x-www-form-urlencoded'),
     );
     return response.data;
@@ -246,10 +249,13 @@ class ApiService {
   }
 
   // ── AI ──
-  Future<Map<String, dynamic>> aiChat(String message, {int? classId, String? imageBase64}) async {
-    final data = <String, dynamic>{'message': message};
+  Future<Map<String, dynamic>> aiChat(List<Map<String, dynamic>> messages, {int? classId, int maxTokens = 1500, double temperature = 0.7}) async {
+    final data = <String, dynamic>{
+      'messages': messages,
+      'max_tokens': maxTokens,
+      'temperature': temperature,
+    };
     if (classId != null) data['class_id'] = classId;
-    if (imageBase64 != null) data['image'] = imageBase64;
     final response = await _dio.post('/ai/chat', data: data);
     return response.data;
   }
