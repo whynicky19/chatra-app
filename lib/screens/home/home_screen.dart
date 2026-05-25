@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/l10n_provider.dart';
 import '../../services/api_service.dart';
@@ -18,18 +19,51 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> _posts = [];
   bool _loading = true;
+  Set<int> _joinedClassIds = {};
 
-  @override void initState() { super.initState(); _load(); }
+  @override void initState() { super.initState(); _loadJoined().then((_) => _load()); }
 
+  // ── Persistence for joined classes (keyed by userId) ──────────────────────
+  String _prefsKey() {
+    final uid = context.read<AuthProvider>().userId ?? 0;
+    return 'joined_classes_$uid';
+  }
+
+  Future<void> _loadJoined() async {
+    final uid = context.read<AuthProvider>().userId ?? 0;
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList('joined_classes_$uid') ?? [];
+    if (mounted) setState(() => _joinedClassIds = list.map(int.parse).toSet());
+  }
+
+  Future<void> _saveJoined() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_prefsKey(), _joinedClassIds.map((e) => e.toString()).toList());
+  }
+
+  Future<void> _joinClass(int id, String title) async {
+    setState(() => _joinedClassIds.add(id));
+    await _saveJoined();
+    if (mounted) showToast(context, 'Joined $title');
+  }
+
+  // ── Data ──────────────────────────────────────────────────────────────────
   Future<void> _load() async {
     if (!mounted) return; setState(() => _loading = true);
     try { _posts = await context.read<ApiService>().getPosts(); } catch (_) {}
     if (mounted) setState(() => _loading = false);
   }
 
-  List<Map<String, dynamic>> get _classes {
+  List<Map<String, dynamic>> get _allClasses {
     return _posts.where((p) { try { return jsonDecode(p['body'])['type'] == 'class'; } catch (_) { return false; } })
       .map((p) { try { final b = jsonDecode(p['body']); return {...p as Map<String, dynamic>, ...b as Map<String, dynamic>, 'title': p['title']}; } catch (_) { return p as Map<String, dynamic>; } }).toList();
+  }
+
+  // Teachers see all their classes; students see only joined ones
+  List<Map<String, dynamic>> get _classes {
+    final auth = context.read<AuthProvider>();
+    if (auth.isTeacher) return _allClasses;
+    return _allClasses.where((c) => _joinedClassIds.contains(c['id'] as int)).toList();
   }
 
   int _lectureCount(int id) => _posts.where((p) => (p['title'] ?? '').startsWith('[LECTURE][$id]')).length;
@@ -71,7 +105,8 @@ class _HomeScreenState extends State<HomeScreen> {
         else if (_classes.isEmpty) SliverFillRemaining(child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(width: 72, height: 72, decoration: BoxDecoration(color: adaptiveTealLt(context), borderRadius: BorderRadius.circular(20)), child: Icon(Icons.menu_book_rounded, color: C.teal, size: 32)),
           SizedBox(height: 16), Text('No classes yet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: C.text3)),
-          SizedBox(height: 16), ElevatedButton(onPressed: _showJoinDialog, child: Text('Join by Code')),
+          SizedBox(height: 8), Text('Enter the code from your teacher', style: TextStyle(fontSize: 14, color: C.text4)),
+          SizedBox(height: 16), ElevatedButton.icon(icon: Icon(Icons.vpn_key_rounded, size: 16, color: Colors.white), label: Text('Join by Code'), onPressed: _showJoinDialog),
         ])))
         else SliverPadding(padding: EdgeInsets.fromLTRB(16, 8, 16, 90), sliver: SliverList(delegate: SliverChildBuilderDelegate((ctx, i) {
           final cls = _classes[i];
@@ -80,7 +115,6 @@ class _HomeScreenState extends State<HomeScreen> {
           final coverImg = cls['cover_image'];
           final teacherName = cls['teacher_name'] ?? '';
           final group = cls['group'] ?? '';
-          final desc = cls['description'] ?? '';
 
           return GestureDetector(
             onTap: () => Navigator.pushNamed(context, '/class', arguments: id),
@@ -91,19 +125,18 @@ class _HomeScreenState extends State<HomeScreen> {
                 // Cover image
                 ClipRRect(borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
                   child: SizedBox(height: 160, width: double.infinity, child: Stack(fit: StackFit.expand, children: [
-                    // Image or gradient
                     if (coverImg != null && coverImg.toString().startsWith('data:'))
                       Builder(builder: (_) { try { return Image.memory(base64Decode(coverImg.toString().split(',').last), fit: BoxFit.cover); } catch (_) { return Container(decoration: BoxDecoration(gradient: LinearGradient(colors: colors))); } })
                     else if (coverImg != null)
                       Image.network(coverImg, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(decoration: BoxDecoration(gradient: LinearGradient(colors: colors))))
                     else
                       Container(decoration: BoxDecoration(gradient: LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight))),
-                    // Code chip
-                    Positioned(top: 10, left: 10, child: GestureDetector(
-                      onTap: () { Clipboard.setData(ClipboardData(text: _code(id))); showToast(context, 'Code copied: ${_code(id)}'); },
-                      child: Container(padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.copy, size: 12, color: Colors.white70), SizedBox(width: 4), Text(_code(id), style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 2))])))),
-                    // Edit button for teachers
+                    // Code chip (teachers only)
+                    if (auth.isTeacher)
+                      Positioned(top: 10, left: 10, child: GestureDetector(
+                        onTap: () { Clipboard.setData(ClipboardData(text: _code(id))); showToast(context, 'Code copied: ${_code(id)}'); },
+                        child: Container(padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.copy, size: 12, color: Colors.white70), SizedBox(width: 4), Text(_code(id), style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 2))])))),
                     if (auth.isTeacher)
                       Positioned(top: 10, right: 10, child: GestureDetector(
                         onTap: () => Navigator.pushNamed(context, '/class', arguments: id),
@@ -132,6 +165,22 @@ class _HomeScreenState extends State<HomeScreen> {
                       },
                       child: Container(width: 34, height: 34, decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(10), border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.3))),
                         child: Icon(Icons.delete_outline, size: 18, color: C.text4))),
+                    // Leave button for students
+                    if (!auth.isTeacher) GestureDetector(
+                      onTap: () async {
+                        final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+                          title: Text('Покинуть класс?'),
+                          content: Text('Вы сможете войти снова по коду.'),
+                          actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Нет')), ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Покинуть'))],
+                        ));
+                        if (ok == true) {
+                          setState(() => _joinedClassIds.remove(id));
+                          await _saveJoined();
+                          showToast(context, 'Left class');
+                        }
+                      },
+                      child: Container(width: 34, height: 34, decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(10), border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.3))),
+                        child: Icon(Icons.logout, size: 18, color: C.text4))),
                   ]),
                 ])),
               ]),
@@ -165,11 +214,18 @@ class _HomeScreenState extends State<HomeScreen> {
           SizedBox(height: 20),
           SizedBox(width: double.infinity, height: 52, child: ElevatedButton(
             style: ElevatedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-            onPressed: () {
+            onPressed: () async {
               final code = ctrl.text.toUpperCase();
-              final found = _classes.where((c) => _code(c['id']) == code).toList();
-              if (found.isNotEmpty) { Navigator.pop(ctx); Navigator.pushNamed(context, '/class', arguments: found.first['id']); showToast(context, 'Joined ${found.first['title']}'); }
-              else showToast(context, 'Class not found', error: true);
+              final found = _allClasses.where((c) => _code(c['id']) == code).toList();
+              if (found.isNotEmpty) {
+                final cls = found.first;
+                final id = cls['id'] as int;
+                Navigator.pop(ctx);
+                await _joinClass(id, cls['title'] ?? '');
+                if (mounted) Navigator.pushNamed(context, '/class', arguments: id);
+              } else {
+                showToast(context, 'Class not found', error: true);
+              }
             },
             child: Text('Join Class', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           )),
@@ -188,14 +244,12 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Container(
           constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.85),
           child: Column(children: [
-            // Header
             Padding(padding: EdgeInsets.fromLTRB(24, 20, 16, 0), child: Row(children: [
               Text('Создать класс', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
               Spacer(),
               IconButton(icon: Icon(Icons.close, size: 22), onPressed: () => Navigator.pop(ctx)),
             ])),
             Expanded(child: SingleChildScrollView(padding: EdgeInsets.fromLTRB(24, 16, 24, 0), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              // Cover
               _fieldLabel3('ОБЛОЖКА КЛАССА'),
               GestureDetector(onTap: () async {
                 final picker = ImagePicker();
@@ -214,7 +268,6 @@ class _HomeScreenState extends State<HomeScreen> {
               SizedBox(height: 16), _fieldLabel3('ГРУППА'), TextField(controller: groupC, decoration: InputDecoration(hintText: 'Например: ИСУ-21')),
               SizedBox(height: 24),
             ]))),
-            // Bottom buttons
             Padding(padding: EdgeInsets.fromLTRB(24, 8, 24, 20), child: Row(children: [
               Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(ctx), child: Text('Отмена'), style: OutlinedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14)))),
               SizedBox(width: 12),
