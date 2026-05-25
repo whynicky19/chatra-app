@@ -69,7 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
         // Class cards
         if (_loading) SliverFillRemaining(child: Center(child: CircularProgressIndicator(color: C.teal)))
         else if (_classes.isEmpty) SliverFillRemaining(child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(width: 72, height: 72, decoration: BoxDecoration(color: C.tealLt, borderRadius: BorderRadius.circular(20)), child: Icon(Icons.menu_book_rounded, color: C.teal, size: 32)),
+          Container(width: 72, height: 72, decoration: BoxDecoration(color: adaptiveTealLt(context), borderRadius: BorderRadius.circular(20)), child: Icon(Icons.menu_book_rounded, color: C.teal, size: 32)),
           SizedBox(height: 16), Text('No classes yet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: C.text3)),
           SizedBox(height: 16), ElevatedButton(onPressed: _showJoinDialog, child: Text('Join by Code')),
         ])))
@@ -113,7 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Padding(padding: EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Row(children: [
                     Expanded(child: Text(cls['title'] ?? '', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800), maxLines: 2, overflow: TextOverflow.ellipsis)),
-                    Container(width: 36, height: 36, decoration: BoxDecoration(color: C.tealLt, borderRadius: BorderRadius.circular(10)),
+                    Container(width: 36, height: 36, decoration: BoxDecoration(color: adaptiveTealLt(context), borderRadius: BorderRadius.circular(10)),
                       child: Icon(Icons.menu_book, size: 18, color: C.teal)),
                   ]),
                   if (group.isNotEmpty) Padding(padding: EdgeInsets.only(top: 4), child: Text(group, style: TextStyle(fontSize: 13, color: C.text4))),
@@ -150,9 +150,9 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (ctx) => Padding(
         padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.of(ctx).viewInsets.bottom + 32),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(width: 40, height: 4, decoration: BoxDecoration(color: C.border, borderRadius: BorderRadius.circular(2))),
+          Container(width: 40, height: 4, decoration: BoxDecoration(color: adaptiveBorder(context), borderRadius: BorderRadius.circular(2))),
           SizedBox(height: 24),
-          Container(width: 64, height: 64, decoration: BoxDecoration(color: C.tealLt, borderRadius: BorderRadius.circular(20)),
+          Container(width: 64, height: 64, decoration: BoxDecoration(color: adaptiveTealLt(context), borderRadius: BorderRadius.circular(20)),
             child: Icon(Icons.vpn_key_rounded, color: C.teal, size: 30)),
           SizedBox(height: 16),
           Text('Join by Code', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
@@ -202,7 +202,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 final img = await picker.pickImage(source: ImageSource.gallery, maxWidth: 800, imageQuality: 80);
                 if (img != null) { final bytes = await img.readAsBytes(); setS(() => coverB64 = 'data:image/jpeg;base64,${base64Encode(bytes)}'); }
               }, child: Container(height: 160, width: double.infinity,
-                decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: C.teal.withOpacity(0.3), width: 1.5, strokeAlign: BorderSide.strokeAlignCenter), color: coverB64 != null ? null : C.tealLt.withOpacity(0.3)),
+                decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: C.teal.withOpacity(0.3), width: 1.5, strokeAlign: BorderSide.strokeAlignCenter), color: coverB64 != null ? null : adaptiveTealLt(context).withOpacity(0.3)),
                 child: coverB64 != null
                   ? ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.memory(base64Decode(coverB64!.split(',').last), fit: BoxFit.cover, width: double.infinity))
                   : Column(mainAxisAlignment: MainAxisAlignment.center, children: [Container(width: 50, height: 50, decoration: BoxDecoration(color: C.teal.withOpacity(0.15), borderRadius: BorderRadius.circular(14)), child: Icon(Icons.image_outlined, size: 26, color: C.teal)), SizedBox(height: 10), Text('Нажмите для загрузки', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: C.teal)), Text('JPG, PNG', style: TextStyle(fontSize: 12, color: C.text4))]))),

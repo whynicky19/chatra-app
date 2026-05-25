@@ -22,7 +22,13 @@ class _LoginScreenState extends State<LoginScreen> {
     }
     setState(() { _error = null; _busy = true; });
     final ok = await context.read<AuthProvider>().login(_email.text.trim(), _pw.text);
-    if (!ok && mounted) setState(() { _error = 'Неверный email или пароль'; _busy = false; });
+    if (!mounted) return;
+    if (ok) {
+      // Pop all named routes so MaterialApp.home reactive switch to MainShell works
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } else {
+      setState(() { _error = 'Неверный email или пароль'; _busy = false; });
+    }
   }
 
   @override

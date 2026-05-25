@@ -21,6 +21,39 @@ class C {
   static const greenLight = greenLt;
   static const yellow = Color(0xFFFBBF24);
   static const tealLight = tealLt;
+
+  // Dark theme equivalents — use these in screens to adapt properly
+  static const darkBg = Color(0xFF0A1214);
+  static const darkSurface = Color(0xFF111B1E);
+  static const darkSurface2 = Color(0xFF1A2830);
+  static const darkBorder = Color(0xFF1E3040);
+  static const darkText1 = Color(0xFFE8F4F6);
+  static const darkText2 = Color(0xFFB0CDD4);
+  static const darkTealLt = Color(0xFF0D2D33);
+}
+
+/// Returns the correct surface2/input-fill color based on current brightness
+Color adaptiveSurface2(BuildContext context) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  return isDark ? C.darkSurface2 : C.surface2;
+}
+
+/// Returns adaptive tealLt (icon backgrounds, chips)
+Color adaptiveTealLt(BuildContext context) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  return isDark ? C.darkTealLt : C.tealLt;
+}
+
+/// Returns adaptive border color
+Color adaptiveBorder(BuildContext context) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  return isDark ? C.darkBorder : C.border;
+}
+
+/// Returns adaptive primary text color
+Color adaptiveText1(BuildContext context) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  return isDark ? C.darkText1 : C.text1;
 }
 
 const _r14 = BorderRadius.all(Radius.circular(14));
@@ -60,15 +93,15 @@ class AppTheme {
   );
 
   static final dark = ThemeData(
-    brightness: Brightness.dark, primaryColor: C.teal, scaffoldBackgroundColor: Color(0xFF0A1214),
-    colorScheme: ColorScheme.dark(primary: C.teal, secondary: C.tealDk, surface: Color(0xFF111B1E), error: C.red),
-    appBarTheme: AppBarTheme(backgroundColor: Color(0xFF111B1E), foregroundColor: Color(0xFFE8F4F6), elevation: 0, surfaceTintColor: Colors.transparent),
-    cardTheme: CardThemeData(color: Color(0xFF111B1E), elevation: 0, shape: RoundedRectangleBorder(borderRadius: _r14)),
-    inputDecorationTheme: _input(Color(0xFF1A2830), C.teal),
+    brightness: Brightness.dark, primaryColor: C.teal, scaffoldBackgroundColor: C.darkBg,
+    colorScheme: ColorScheme.dark(primary: C.teal, secondary: C.tealDk, surface: C.darkSurface, error: C.red),
+    appBarTheme: AppBarTheme(backgroundColor: C.darkSurface, foregroundColor: C.darkText1, elevation: 0, surfaceTintColor: Colors.transparent),
+    cardTheme: CardThemeData(color: C.darkSurface, elevation: 0, shape: RoundedRectangleBorder(borderRadius: _r14)),
+    inputDecorationTheme: _input(C.darkSurface2, C.teal),
     elevatedButtonTheme: _btn(),
     outlinedButtonTheme: OutlinedButtonThemeData(style: OutlinedButton.styleFrom(foregroundColor: C.teal, side: BorderSide(color: C.teal, width: 1.5), padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12), shape: RoundedRectangleBorder(borderRadius: _r14))),
     snackBarTheme: SnackBarThemeData(behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: _r14)),
     pageTransitionsTheme: _pageTransitions,
-    dividerColor: Color(0xFF1E3040).withOpacity(0.4),
+    dividerColor: C.darkBorder.withOpacity(0.4),
   );
 }

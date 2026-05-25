@@ -32,8 +32,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!_ok) return;
     final auth = context.read<AuthProvider>();
     final ok = await auth.register(_email.text.trim(), _pw.text, 'student', fullName: _name.text.trim(), group: _group);
-    if (ok && mounted) { showToast(context, 'Регистрация успешна!'); Navigator.pushReplacementNamed(context, '/login'); }
-    else if (mounted) showToast(context, auth.lastError ?? 'Ошибка', error: true);
+    if (!mounted) return;
+    if (ok) {
+      // Auto-login after successful registration
+      final loggedIn = await auth.login(_email.text.trim(), _pw.text);
+      if (!mounted) return;
+      if (loggedIn) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      } else {
+        // Login failed for some reason — go to login screen
+        showToast(context, 'Регистрация успешна! Войдите в аккаунт.');
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+    } else {
+      showToast(context, auth.lastError ?? 'Ошибка', error: true);
+    }
   }
 
   @override

@@ -100,7 +100,7 @@ class _AdminState extends State<AdminScreen> with SingleTickerProviderStateMixin
                   Text(name, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)), SizedBox(height: 2),
                   Text(u['email'] ?? '', style: TextStyle(fontSize: 12, color: C.text4)),
                 ])),
-                Container(padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: u['role'] == 'admin' ? C.tealLt : C.surface2, borderRadius: BorderRadius.circular(20)),
+                Container(padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: u['role'] == 'admin' ? adaptiveTealLt(context) : adaptiveSurface2(context), borderRadius: BorderRadius.circular(20)),
                   child: Text(u['role'] ?? '', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: u['role'] == 'admin' ? C.teal : C.text4))),
                 PopupMenuButton<String>(icon: Icon(Icons.more_vert, size: 20, color: C.text4), onSelected: (v) => _action(u, v), itemBuilder: (_) => [
                   PopupMenuItem(value: 'student', child: Text('Set Student')), PopupMenuItem(value: 'teacher', child: Text('Set Teacher')),
@@ -155,7 +155,7 @@ class _AdminState extends State<AdminScreen> with SingleTickerProviderStateMixin
               Text(l['user_name'] ?? l['user_email'] ?? '#${l['user_id']}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
               Text(l['created_at'] ?? '', style: TextStyle(fontSize: 11, color: C.text4)),
             ])),
-            Container(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(color: C.tealLt, borderRadius: BorderRadius.circular(8)),
+            Container(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(color: adaptiveTealLt(context), borderRadius: BorderRadius.circular(8)),
               child: Text('${l['total_tokens'] ?? 0} tok', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: C.teal))),
           ]))),
       ],
