@@ -4,7 +4,8 @@ import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final VoidCallback? onGoRegister;
+  const LoginScreen({super.key, this.onGoRegister});
   @override State<LoginScreen> createState() => _LoginScreenState();
 }
 
@@ -23,12 +24,12 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() { _error = null; _busy = true; });
     final ok = await context.read<AuthProvider>().login(_email.text.trim(), _pw.text);
     if (!mounted) return;
-    if (ok) {
-      // Pop all named routes so MaterialApp.home reactive switch to MainShell works
-      Navigator.of(context).popUntil((route) => route.isFirst);
-    } else {
+    // При ok == true _AuthGate сам переключится на MainShell через auth.isAuthenticated
+    if (!ok) {
       setState(() { _error = 'Неверный email или пароль'; _busy = false; });
     }
+    // Если ok — просто ждём реактивного переключения, _busy сбрасываем на случай задержки
+    if (ok) setState(() => _busy = false);
   }
 
   @override
@@ -50,29 +51,40 @@ class _LoginScreenState extends State<LoginScreen> {
             Text('Войдите в свой аккаунт', style: TextStyle(fontSize: 14, color: C.text4)),
             SizedBox(height: 28),
             _label('Email'),
-            TextField(controller: _email, keyboardType: TextInputType.emailAddress, decoration: InputDecoration(hintText: 'you@example.com'), onSubmitted: (_) => _submit()),
+            TextField(controller: _email, keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(hintText: 'you@example.com'), onSubmitted: (_) => _submit()),
             SizedBox(height: 14),
             _label('Пароль'),
-            TextField(controller: _pw, obscureText: !_showPw, decoration: InputDecoration(hintText: '••••••••',
-              suffixIcon: IconButton(icon: Icon(_showPw ? Icons.visibility_off : Icons.visibility, color: C.text4, size: 20), onPressed: () => setState(() => _showPw = !_showPw))),
+            TextField(controller: _pw, obscureText: !_showPw,
+              decoration: InputDecoration(hintText: '••••••••',
+                suffixIcon: IconButton(icon: Icon(_showPw ? Icons.visibility_off : Icons.visibility, color: C.text4, size: 20),
+                  onPressed: () => setState(() => _showPw = !_showPw))),
               onSubmitted: (_) => _submit()),
             if (_error != null) Padding(padding: EdgeInsets.only(top: 10), child: Container(
               width: double.infinity, padding: EdgeInsets.all(12),
               decoration: BoxDecoration(color: C.redLt, borderRadius: BorderRadius.circular(12)),
-              child: Row(children: [Icon(Icons.error_outline, color: C.red, size: 16), SizedBox(width: 8), Expanded(child: Text(_error!, style: TextStyle(color: C.red, fontSize: 13)))]))),
+              child: Row(children: [Icon(Icons.error_outline, color: C.red, size: 16), SizedBox(width: 8),
+                Expanded(child: Text(_error!, style: TextStyle(color: C.red, fontSize: 13)))]))),
             SizedBox(height: 20),
             SizedBox(width: double.infinity, height: 50, child: ElevatedButton(
               onPressed: _busy ? null : _submit,
-              child: _busy ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Text('Войти'))),
+              child: _busy
+                ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : Text('Войти'))),
             SizedBox(height: 20),
             Row(mainAxisAlignment: MainAxisAlignment.center, children: [
               Text('Нет аккаунта? ', style: TextStyle(fontSize: 13, color: C.text4)),
-              GestureDetector(onTap: () => Navigator.pushReplacementNamed(context, '/register'), child: Text('Зарегистрируйтесь', style: TextStyle(fontSize: 13, color: C.teal, fontWeight: FontWeight.w600))),
+              GestureDetector(
+                onTap: widget.onGoRegister,
+                child: Text('Зарегистрируйтесь', style: TextStyle(fontSize: 13, color: C.teal, fontWeight: FontWeight.w600))),
             ]),
           ]),
         ),
       ))),
     );
   }
-  Widget _label(String s) => Padding(padding: EdgeInsets.only(bottom: 6), child: Align(alignment: Alignment.centerLeft, child: Text(s, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: C.text3))));
+
+  Widget _label(String s) => Padding(padding: EdgeInsets.only(bottom: 6),
+    child: Align(alignment: Alignment.centerLeft,
+      child: Text(s, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: C.text3))));
 }

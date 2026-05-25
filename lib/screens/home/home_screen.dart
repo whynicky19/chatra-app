@@ -108,7 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
           SizedBox(height: 8), Text('Enter the code from your teacher', style: TextStyle(fontSize: 14, color: C.text4)),
           SizedBox(height: 16), ElevatedButton.icon(icon: Icon(Icons.vpn_key_rounded, size: 16, color: Colors.white), label: Text('Join by Code'), onPressed: _showJoinDialog),
         ])))
-        else SliverPadding(padding: EdgeInsets.fromLTRB(16, 8, 16, 90), sliver: SliverList(delegate: SliverChildBuilderDelegate((ctx, i) {
+        else SliverPadding(padding: EdgeInsets.fromLTRB(16, 8, 16, 0), sliver: SliverList(delegate: SliverChildBuilderDelegate((ctx, i) {
           final cls = _classes[i];
           final id = cls['id'] as int;
           final colors = _grads[id % _grads.length];
@@ -187,50 +187,141 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           );
         }, childCount: _classes.length))),
+        // "Add new subject" card — students only
+        if (!auth.isTeacher && !_loading && _classes.isNotEmpty)
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 90),
+            sliver: SliverToBoxAdapter(child: GestureDetector(
+              onTap: _showJoinDialog,
+              child: Container(
+                margin: EdgeInsets.only(top: 8),
+                padding: EdgeInsets.symmetric(vertical: 32),
+                decoration: BoxDecoration(
+                  color: surface,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: C.teal.withOpacity(0.35), width: 1.5, strokeAlign: BorderSide.strokeAlignCenter),
+                ),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Container(width: 56, height: 56, decoration: BoxDecoration(shape: BoxShape.circle,
+                    border: Border.all(color: C.teal.withOpacity(0.4), width: 2, strokeAlign: BorderSide.strokeAlignCenter)),
+                    child: Icon(Icons.add, color: C.teal, size: 28)),
+                  SizedBox(height: 14),
+                  Text('Добавить предмет', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: adaptiveText1(context))),
+                  SizedBox(height: 4),
+                  Text('Персонализируйте своё обучение', style: TextStyle(fontSize: 13, color: C.text4)),
+                ]),
+              ),
+            )),
+          )
+        else if (!_loading)
+          SliverToBoxAdapter(child: SizedBox(height: 90)),
       ]))),
     );
   }
 
   void _showJoinDialog() {
-    final ctrl = TextEditingController();
-    showModalBottomSheet(context: context, isScrollControlled: true,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.of(ctx).viewInsets.bottom + 32),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(width: 40, height: 4, decoration: BoxDecoration(color: adaptiveBorder(context), borderRadius: BorderRadius.circular(2))),
-          SizedBox(height: 24),
-          Container(width: 64, height: 64, decoration: BoxDecoration(color: adaptiveTealLt(context), borderRadius: BorderRadius.circular(20)),
-            child: Icon(Icons.vpn_key_rounded, color: C.teal, size: 30)),
-          SizedBox(height: 16),
-          Text('Join by Code', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-          SizedBox(height: 6),
-          Text('Ask your teacher for the 6-digit code', style: TextStyle(fontSize: 14, color: C.text4)),
-          SizedBox(height: 24),
-          TextField(controller: ctrl, textAlign: TextAlign.center, maxLength: 6, textCapitalization: TextCapitalization.characters,
-            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 10, color: C.teal),
-            decoration: InputDecoration(counterText: '', hintText: '------', hintStyle: TextStyle(letterSpacing: 10, color: C.text4.withOpacity(0.3)))),
-          SizedBox(height: 20),
-          SizedBox(width: double.infinity, height: 52, child: ElevatedButton(
-            style: ElevatedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-            onPressed: () async {
-              final code = ctrl.text.toUpperCase();
-              final found = _allClasses.where((c) => _code(c['id']) == code).toList();
-              if (found.isNotEmpty) {
-                final cls = found.first;
-                final id = cls['id'] as int;
-                Navigator.pop(ctx);
-                await _joinClass(id, cls['title'] ?? '');
-                if (mounted) Navigator.pushNamed(context, '/class', arguments: id);
-              } else {
-                showToast(context, 'Class not found', error: true);
-              }
-            },
-            child: Text('Join Class', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-          )),
-        ]),
-      ),
+    final controllers = List.generate(6, (_) => TextEditingController());
+    final focusNodes = List.generate(6, (_) => FocusNode());
+    bool busy = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setS) {
+        String get6Code() => controllers.map((c) => c.text.toUpperCase()).join();
+
+        void onKey(int i, String val) {
+          if (val.length > 1) {
+            // Handle paste
+            final clean = val.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+            for (int j = 0; j < 6 && j < clean.length; j++) {
+              controllers[j].text = clean[j];
+            }
+            focusNodes[5].requestFocus();
+            setS(() {});
+            return;
+          }
+          if (val.isNotEmpty && i < 5) focusNodes[i + 1].requestFocus();
+          setS(() {});
+        }
+
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+          insetPadding: EdgeInsets.symmetric(horizontal: 24),
+          child: Padding(
+            padding: EdgeInsets.all(28),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              // Close button
+              Align(alignment: Alignment.topRight,
+                child: GestureDetector(onTap: () => Navigator.pop(ctx),
+                  child: Container(width: 32, height: 32, decoration: BoxDecoration(color: adaptiveSurface2(context), shape: BoxShape.circle),
+                    child: Icon(Icons.close, size: 16, color: C.text4)))),
+              SizedBox(height: 4),
+              // Lock icon
+              Container(width: 68, height: 68, decoration: BoxDecoration(color: adaptiveTealLt(context), borderRadius: BorderRadius.circular(20)),
+                child: Icon(Icons.lock_outline_rounded, color: C.teal, size: 32)),
+              SizedBox(height: 16),
+              Text('Войти в класс по коду', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+              SizedBox(height: 8),
+              Text('Введите 6-значный код класса, который вам дал преподаватель',
+                textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: C.text4, height: 1.5)),
+              SizedBox(height: 24),
+              // 6 OTP boxes
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: List.generate(6, (i) =>
+                SizedBox(width: 44, height: 52,
+                  child: TextField(
+                    controller: controllers[i],
+                    focusNode: focusNodes[i],
+                    textAlign: TextAlign.center,
+                    maxLength: i == 0 ? 6 : 1, // Allow paste on first box
+                    textCapitalization: TextCapitalization.characters,
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: C.teal),
+                    decoration: InputDecoration(
+                      counterText: '',
+                      filled: true,
+                      fillColor: adaptiveSurface2(context),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: C.teal, width: 2)),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    onChanged: (val) => onKey(i, val),
+                    onTap: () => controllers[i].selection = TextSelection(baseOffset: 0, extentOffset: controllers[i].text.length),
+                  )))),
+              SizedBox(height: 24),
+              Divider(height: 1),
+              SizedBox(height: 20),
+              Row(children: [
+                Expanded(child: OutlinedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: OutlinedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14)),
+                  child: Text('Отмена'))),
+                SizedBox(width: 12),
+                Expanded(child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14)),
+                  onPressed: busy ? null : () async {
+                    final code = get6Code();
+                    if (code.length < 6) { showToast(context, 'Введите 6 символов', error: true); return; }
+                    setS(() => busy = true);
+                    final found = _allClasses.where((c) => _code(c['id']) == code).toList();
+                    if (found.isNotEmpty) {
+                      final cls = found.first;
+                      final id = cls['id'] as int;
+                      Navigator.pop(ctx);
+                      await _joinClass(id, cls['title'] ?? '');
+                      if (mounted) Navigator.pushNamed(context, '/class', arguments: id);
+                    } else {
+                      setS(() => busy = false);
+                      showToast(context, 'Класс не найден', error: true);
+                    }
+                  },
+                  child: busy
+                    ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : Text('Войти в класс'))),
+              ]),
+            ]),
+          ),
+        );
+      }),
     );
   }
 

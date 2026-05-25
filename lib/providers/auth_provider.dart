@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dio/dio.dart';
 import '../services/api_service.dart';
 
 class AuthProvider extends ChangeNotifier {
@@ -82,12 +83,13 @@ class AuthProvider extends ChangeNotifier {
       return true;
     } catch (e) {
       _isLoading = false;
-      if (e.toString().contains('409')) {
+      final statusCode = (e is DioException) ? e.response?.statusCode : null;
+      if (statusCode == 409) {
         lastError = 'Этот email уже зарегистрирован';
-      } else if (e.toString().contains('400')) {
+      } else if (statusCode == 400) {
         lastError = 'Такой группы не существует';
       } else {
-        lastError = 'Ошибка регистрации';
+        lastError = 'Ошибка регистрации. Попробуйте снова';
       }
       notifyListeners();
       return false;

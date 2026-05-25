@@ -20,7 +20,6 @@ void main() {
   final theme = ThemeProvider();
   final l10n = L10n();
 
-  // Init async before runApp
   Future.wait([auth.init(), theme.init(), l10n.init()]).then((_) {
     api.onUnauthorized = () => auth.logout();
   });
@@ -41,28 +40,61 @@ class ChatraApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
     final theme = context.watch<ThemeProvider>();
     return MaterialApp(
       title: 'Chatra', debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: theme.mode,
-      home: !auth.initialized ? _Splash() : auth.isAuthenticated ? MainShell() : LoginScreen(),
+      home: const _AuthGate(),
       onGenerateRoute: (s) {
         switch (s.name) {
-          case '/login': return MaterialPageRoute(builder: (_) => LoginScreen());
-          case '/register': return MaterialPageRoute(builder: (_) => RegisterScreen());
-          case '/home': return MaterialPageRoute(builder: (_) => MainShell());
           case '/class': return MaterialPageRoute(builder: (_) => ClassDetailScreen(classId: s.arguments as int));
-          default: return MaterialPageRoute(builder: (_) => MainShell());
+          default: return MaterialPageRoute(builder: (_) => const _AuthGate());
         }
       },
     );
   }
 }
 
+class _AuthGate extends StatelessWidget {
+  const _AuthGate();
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    if (!auth.initialized) return const _Splash();
+    if (auth.isAuthenticated) return const MainShell();
+    return const _AuthNavigator();
+  }
+}
+
+// Отдельный Navigator только для auth экранов
+class _AuthNavigator extends StatefulWidget {
+  const _AuthNavigator();
+  @override
+  State<_AuthNavigator> createState() => _AuthNavigatorState();
+}
+
+class _AuthNavigatorState extends State<_AuthNavigator> {
+  bool _showRegister = false;
+
+  void _goRegister() => setState(() => _showRegister = true);
+  void _goLogin() => setState(() => _showRegister = false);
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 250),
+      child: _showRegister
+          ? RegisterScreen(key: const ValueKey('register'), onGoLogin: _goLogin)
+          : LoginScreen(key: const ValueKey('login'), onGoRegister: _goRegister),
+    );
+  }
+}
+
 class _Splash extends StatelessWidget {
+  const _Splash();
   @override
   Widget build(BuildContext context) => Scaffold(
     body: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
