@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/l10n_provider.dart';
 import '../theme/app_theme.dart';
 import 'home/home_screen.dart';
 import 'chats/chats_screen.dart';
@@ -37,6 +38,7 @@ class _MainShellState extends State<MainShell> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final l = context.watch<L10n>();
     final isAdmin = auth.isAdmin;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final navBg = isDark ? Color(0xFF111B1E) : Colors.white;
@@ -49,11 +51,11 @@ class _MainShellState extends State<MainShell> with TickerProviderStateMixin {
     ];
 
     final items = <_NavItem>[
-      _NavItem(Icons.school_outlined, Icons.school_rounded, 'Classes'),
-      _NavItem(Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, 'Chats'),
-      _NavItem(Icons.auto_awesome_outlined, Icons.auto_awesome, 'AI'),
-      if (isAdmin) _NavItem(Icons.admin_panel_settings_outlined, Icons.admin_panel_settings, 'Admin'),
-      _NavItem(Icons.settings_outlined, Icons.settings_rounded, 'Settings'),
+      _NavItem(Icons.school_outlined, Icons.school_rounded, l.t('nav_classes')),
+      _NavItem(Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, l.t('nav_chats')),
+      _NavItem(Icons.auto_awesome_outlined, Icons.auto_awesome, l.t('nav_ai')),
+      if (isAdmin) _NavItem(Icons.admin_panel_settings_outlined, Icons.admin_panel_settings, l.t('nav_admin')),
+      _NavItem(Icons.settings_outlined, Icons.settings_rounded, l.t('nav_settings')),
     ];
 
     if (_idx >= screens.length) _idx = 0;

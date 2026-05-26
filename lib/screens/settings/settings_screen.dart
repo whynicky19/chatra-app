@@ -28,9 +28,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     return Scaffold(
       body: SafeArea(child: ListView(padding: EdgeInsets.fromLTRB(16, 16, 16, 90), children: [
-        Text('Настройки', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: C.teal)),
+        Text(l.t('settings'), style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: C.teal)),
         SizedBox(height: 4),
-        Text('Управляйте профилем и настройками', style: TextStyle(fontSize: 14, color: C.text4)),
+        Text(l.t('settings_sub'), style: TextStyle(fontSize: 14, color: C.text4)),
         SizedBox(height: 24),
 
         // Profile card
@@ -38,17 +38,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(children: [
             CircleAvatar(radius: 44, backgroundColor: C.teal, child: Text(auth.initials, style: TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w800))),
             SizedBox(height: 12),
-            Text('Academic Profile', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: text1)),
-            Text(_roleLabel(auth.role), style: TextStyle(fontSize: 13, color: C.teal, fontWeight: FontWeight.w500)),
+            Text(l.t('academic_profile'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: text1)),
+            Text(_roleLabel(auth.role, l), style: TextStyle(fontSize: 13, color: C.teal, fontWeight: FontWeight.w500)),
             SizedBox(height: 20),
-            _label('FULL NAME'),
+            _label(l.t('full_name')),
             TextField(controller: _nameCtrl, decoration: InputDecoration(prefixIcon: Icon(Icons.person_outline, size: 18, color: C.teal))),
             SizedBox(height: 14),
-            _label('EMAIL'),
+            _label(l.t('email')),
             TextField(enabled: false, decoration: InputDecoration(hintText: auth.email, prefixIcon: Icon(Icons.mail_outline, size: 18, color: C.teal))),
             SizedBox(height: 14),
             if (auth.group.isNotEmpty) ...[
-              _label('GROUP'),
+              _label(l.t('group')),
               Container(padding: EdgeInsets.symmetric(horizontal: 14, vertical: 14), decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(14)),
                 child: Text(auth.group, style: TextStyle(fontSize: 14, color: text1))),
               SizedBox(height: 14),
@@ -56,21 +56,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
             SizedBox(height: 20),
             SizedBox(width: double.infinity, height: 48, child: ElevatedButton(onPressed: () async {
               await auth.updateProfile(_nameCtrl.text.trim());
-              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Saved'), backgroundColor: C.teal));
-            }, child: Text('Save Changes'))),
+              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l.t('saved')), backgroundColor: C.teal));
+            }, child: Text(l.t('save_changes')))),
           ])),
         SizedBox(height: 16),
 
         // Preferences
         Container(padding: EdgeInsets.all(20), decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(22)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Preferences', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: text1)),
+            Text(l.t('preferences'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: text1)),
             SizedBox(height: 16),
-            _prefRow(Icons.dark_mode_outlined, 'Dark Mode', 'Switch theme', themeProv.isDark, (_) => themeProv.toggle()),
+            _prefRow(Icons.dark_mode_outlined, l.t('dark_mode'), l.t('dark_sub'), themeProv.isDark, (_) => themeProv.toggle()),
             SizedBox(height: 10),
-            _prefRow(Icons.notifications_outlined, 'Notifications', 'Real-time alerts', _notif, (v) => setState(() => _notif = v)),
+            _prefRow(Icons.notifications_outlined, l.t('notif'), l.t('notif_sub'), _notif, (v) => setState(() => _notif = v)),
             SizedBox(height: 10),
-            _prefRow(Icons.auto_awesome_outlined, 'AI Insights', 'Predictive learning', _aiInsights, (v) => setState(() => _aiInsights = v)),
+            _prefRow(Icons.auto_awesome_outlined, l.t('ai_insights'), l.t('ai_sub'), _aiInsights, (v) => setState(() => _aiInsights = v)),
             SizedBox(height: 14),
             // Language
             Text(l.t('language'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: text1)),
@@ -103,9 +103,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Icon(Icons.logout, color: C.red, size: 22)),
             SizedBox(width: 14),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Выйти из аккаунта', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: C.red)),
+              Text(l.t('logout'), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: C.red)),
               SizedBox(height: 2),
-              Text('Вы будете перенаправлены на страницу входа', style: TextStyle(fontSize: 12, color: C.text4)),
+              Text(l.t('logout_sub'), style: TextStyle(fontSize: 12, color: C.text4)),
             ])),
             IconButton(icon: Icon(Icons.chevron_right, color: C.red), onPressed: () => auth.logout()),
           ])),
@@ -128,5 +128,5 @@ class _SettingsScreenState extends State<SettingsScreen> {
       Switch(value: val, onChanged: onChanged, activeColor: C.teal),
     ]));
 
-  String _roleLabel(String r) => r == 'admin' ? 'Administrator' : r == 'teacher' ? 'Teacher' : 'Student';
+  String _roleLabel(String r, L10n l) => r == 'admin' ? l.t('role_admin') : r == 'teacher' ? l.t('role_teacher') : l.t('role_student');
 }

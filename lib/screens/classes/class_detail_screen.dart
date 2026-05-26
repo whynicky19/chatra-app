@@ -482,12 +482,115 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
               Container(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: adaptiveTealLt(context), borderRadius: BorderRadius.circular(8)),
                 child: Text('${c['weight'] ?? 0}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: C.teal)))])))
         ],
-        // Grade result (students see their grade)
-        if (sub?['grade'] != null) ...[SizedBox(height: 16), Container(padding: EdgeInsets.all(14), decoration: BoxDecoration(color: C.greenLt, borderRadius: BorderRadius.circular(12)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [Icon(Icons.check_circle, size: 18, color: C.green), SizedBox(width: 8), Text('Оценка: ${sub['grade']['score']}/${a['max_score']}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: C.green))]),
-            if (sub['grade']['feedback'] != null) Padding(padding: EdgeInsets.only(top: 8), child: Text(sub['grade']['feedback'], style: TextStyle(fontSize: 13, color: adaptiveText1(context), height: 1.5))),
-          ]))],
+        // Grade result (students see their grade) — FULL FEEDBACK
+        if (sub?['grade'] != null) ...[
+          SizedBox(height: 16),
+          // Main score card
+          Container(padding: EdgeInsets.all(18), decoration: BoxDecoration(color: adaptiveSurface2(context), borderRadius: BorderRadius.circular(16), border: Border.all(color: adaptiveBorder(context))),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                RichText(text: TextSpan(children: [
+                  TextSpan(text: '${sub['grade']['score']}', style: TextStyle(fontSize: 42, fontWeight: FontWeight.w900, color: C.teal, height: 1)),
+                  TextSpan(text: ' / ${a['max_score']}', style: TextStyle(fontSize: 18, color: C.text4, fontWeight: FontWeight.w600)),
+                ])),
+                Spacer(),
+                Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  Text('${(sub['grade']['score'] / (a['max_score'] ?? 100) * 100).round()}%', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: adaptiveText1(context))),
+                  SizedBox(height: 4),
+                  Container(padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: C.teal.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(sub['grade']['graded_by'] == 'ai' ? Icons.bolt : Icons.person, size: 14, color: C.teal),
+                      SizedBox(width: 4),
+                      Text(sub['grade']['graded_by'] == 'ai' ? 'ИИ-проверка' : 'Учитель', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: C.teal)),
+                    ])),
+                ]),
+              ]),
+              // Feedback text
+              if (sub['grade']['feedback'] != null) ...[
+                SizedBox(height: 14),
+                Text('ФИДБЕК', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: C.text4, letterSpacing: 1)),
+                SizedBox(height: 6),
+                Text(sub['grade']['feedback'], style: TextStyle(fontSize: 14, color: adaptiveText1(context), height: 1.6)),
+              ],
+            ])),
+          // Criteria scores breakdown
+          if (sub['grade']['criteria_scores'] != null) ...[
+            SizedBox(height: 12),
+            Text('ПО КРИТЕРИЯМ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: C.text4, letterSpacing: 1)),
+            SizedBox(height: 8),
+            ...(() {
+              List<dynamic> criteriaScores = [];
+              try { criteriaScores = jsonDecode(sub['grade']['criteria_scores']); } catch (_) {
+                if (sub['grade']['criteria_scores'] is List) criteriaScores = sub['grade']['criteria_scores'];
+              }
+              return criteriaScores.map<Widget>((cs) {
+                final score = (cs['score'] ?? 0) as num;
+                final maxScore = (cs['max_score'] ?? cs['max'] ?? cs['weight'] ?? 100) as num;
+                final pct = maxScore > 0 ? score / maxScore : 0.0;
+                return Container(margin: EdgeInsets.only(bottom: 8), padding: EdgeInsets.all(14),
+                  decoration: BoxDecoration(color: adaptiveSurface2(context), borderRadius: BorderRadius.circular(14)),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      Expanded(child: Text(cs['name'] ?? '', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
+                      RichText(text: TextSpan(children: [
+                        TextSpan(text: '${score.toInt()}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: C.teal)),
+                        TextSpan(text: ' / ${maxScore.toInt()}', style: TextStyle(fontSize: 13, color: C.text4)),
+                      ])),
+                    ]),
+                    if (cs['comment'] != null || cs['feedback'] != null)
+                      Padding(padding: EdgeInsets.only(top: 6), child: Text(cs['comment'] ?? cs['feedback'] ?? '', style: TextStyle(fontSize: 13, color: C.text4, height: 1.5))),
+                    SizedBox(height: 8),
+                    ClipRRect(borderRadius: BorderRadius.circular(3),
+                      child: LinearProgressIndicator(value: pct.toDouble(), backgroundColor: adaptiveBorder(context), color: C.teal, minHeight: 4)),
+                  ]));
+              }).toList();
+            })(),
+          ],
+        ],
+        // AI grading in progress
+        if (sub != null && sub['status'] == 'grading' && sub['grade'] == null) ...[
+          SizedBox(height: 16),
+          Container(padding: EdgeInsets.all(14), decoration: BoxDecoration(color: C.teal.withOpacity(0.06), borderRadius: BorderRadius.circular(14), border: Border.all(color: C.teal.withOpacity(0.15))),
+            child: Row(children: [
+              SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: C.teal)),
+              SizedBox(width: 12),
+              Expanded(child: Text('ИИ проверяет вашу работу...', style: TextStyle(fontSize: 13, color: C.teal, fontWeight: FontWeight.w500))),
+            ])),
+        ],
+        // Student answer preview (if submitted)
+        if (sub != null && sub['text_content'] != null) ...[
+          SizedBox(height: 16),
+          Text('ВАШ ОТВЕТ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: C.text4, letterSpacing: 1)),
+          SizedBox(height: 6),
+          Container(padding: EdgeInsets.all(12), decoration: BoxDecoration(color: adaptiveSurface2(context), borderRadius: BorderRadius.circular(12)),
+            child: Text(sub['text_content'], style: TextStyle(fontSize: 13, height: 1.6), maxLines: 5, overflow: TextOverflow.ellipsis)),
+        ],
+        // Retract button (students, submitted but not graded)
+        if (!isTeacherOrAdmin && sub != null && sub['status'] != 'graded') ...[
+          SizedBox(height: 12),
+          GestureDetector(
+            onTap: busy ? null : () async {
+              setS(() => busy = true);
+              try {
+                await context.read<ApiService>().retractSubmission(sub['id']);
+                Navigator.pop(ctx);
+                showToast(context, 'Сдача отозвана — можно отправить заново');
+                _loadAssignments();
+              } catch (_) {
+                showToast(context, 'Ошибка', error: true);
+              }
+              setS(() => busy = false);
+            },
+            child: Container(padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(color: adaptiveSurface2(context), borderRadius: BorderRadius.circular(12)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.replay, size: 14, color: C.text4),
+                SizedBox(width: 6),
+                Text(busy ? 'Отзыв...' : 'Отозвать и сдать заново', style: TextStyle(fontSize: 13, color: C.text4)),
+              ])),
+          ),
+        ],
         // Submit block (students, not yet submitted)
         if (!isTeacherOrAdmin && sub == null) ...[
           SizedBox(height: 20),

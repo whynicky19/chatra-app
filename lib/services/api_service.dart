@@ -200,6 +200,15 @@ class ApiService {
     return response.data;
   }
 
+  Future<void> retractSubmission(int submissionId) async {
+    await _dio.delete('/submissions/$submissionId/retract');
+  }
+
+  Future<Map<String, dynamic>> getSubmission(int id) async {
+    final response = await _dio.get('/submissions/$id');
+    return response.data;
+  }
+
   Future<Map<String, dynamic>> getMyRating({int? classId}) async {
     final params = classId != null ? '?class_id=$classId' : '';
     final response = await _dio.get('/assignments/student/my-rating$params');

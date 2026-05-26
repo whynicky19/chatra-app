@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../../providers/l10n_provider.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 
@@ -17,13 +18,6 @@ class _AiScreenState extends State<AiScreen> with TickerProviderStateMixin {
   late AnimationController _pulseCtrl;
   late AnimationController _fadeCtrl;
 
-  final _tips = [
-    {'icon': Icons.menu_book_rounded, 'text': 'Объясни материал', 'color': Color(0xFF0891B2)},
-    {'icon': Icons.key_rounded, 'text': 'Ключевые понятия', 'color': Color(0xFF6366F1)},
-    {'icon': Icons.assignment_outlined, 'text': 'Помощь с заданием', 'color': Color(0xFF059669)},
-    {'icon': Icons.error_outline, 'text': 'Частые ошибки', 'color': Color(0xFFD97706)},
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -31,6 +25,13 @@ class _AiScreenState extends State<AiScreen> with TickerProviderStateMixin {
     _fadeCtrl = AnimationController(vsync: this, duration: Duration(milliseconds: 600))..forward();
   }
   @override void dispose() { _pulseCtrl.dispose(); _fadeCtrl.dispose(); super.dispose(); }
+
+  List<Map<String, dynamic>> _tips(L10n l) => [
+    {'icon': Icons.menu_book_rounded, 'text': l.t('tip_explain'), 'color': Color(0xFF0891B2)},
+    {'icon': Icons.key_rounded, 'text': l.t('tip_concepts'), 'color': Color(0xFF6366F1)},
+    {'icon': Icons.assignment_outlined, 'text': l.t('tip_help'), 'color': Color(0xFF059669)},
+    {'icon': Icons.error_outline, 'text': l.t('tip_mistakes'), 'color': Color(0xFFD97706)},
+  ];
 
   void _send([String? override]) async {
     final text = override ?? _ctrl.text.trim();
@@ -41,14 +42,17 @@ class _AiScreenState extends State<AiScreen> with TickerProviderStateMixin {
     _scrollDown();
     try {
       final api = context.read<ApiService>();
+      final l = context.read<L10n>();
+      final sysLang = l.lang == 'KZ' ? 'казахском' : l.lang == 'EN' ? 'английском' : 'русском';
       final apiMsgs = <Map<String, dynamic>>[
-        {'role': 'system', 'content': 'Ты AI-ассистент образовательной платформы Chatra. Отвечай на русском языке.'},
+        {'role': 'system', 'content': 'Ты AI-ассистент образовательной платформы Chatra. Отвечай на $sysLang языке.'},
         ..._msgs.map((m) => {'role': m['role']!, 'content': m['text']!}),
       ];
       final data = await api.aiChat(apiMsgs);
-      setState(() => _msgs.add({'role': 'assistant', 'text': data['content'] ?? 'Нет ответа'}));
+      setState(() => _msgs.add({'role': 'assistant', 'text': data['content'] ?? l.t('no_answer')}));
     } catch (e) {
-      setState(() => _msgs.add({'role': 'assistant', 'text': e.toString().contains('503') ? 'AI не настроен' : 'Ошибка соединения'}));
+      final l = context.read<L10n>();
+      setState(() => _msgs.add({'role': 'assistant', 'text': e.toString().contains('503') ? l.t('ai_not_configured') : l.t('connection_error')}));
     }
     setState(() => _loading = false);
     _scrollDown();
@@ -62,10 +66,11 @@ class _AiScreenState extends State<AiScreen> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surface = Theme.of(context).colorScheme.surface;
+    final l = context.watch<L10n>();
 
     return Scaffold(
       body: SafeArea(child: Column(children: [
-        // Header with gradient
+        // Header
         Container(
           padding: EdgeInsets.fromLTRB(16, 14, 16, 14),
           decoration: BoxDecoration(
@@ -79,8 +84,8 @@ class _AiScreenState extends State<AiScreen> with TickerProviderStateMixin {
               child: Icon(Icons.auto_awesome, color: C.teal, size: 22)),
             SizedBox(width: 12),
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('AI Ассистент', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-              Text('Спросите что угодно', style: TextStyle(fontSize: 12, color: C.text4)),
+              Text(l.t('ai_assistant'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              Text(l.t('ai_ask_anything'), style: TextStyle(fontSize: 12, color: C.text4)),
             ]),
             Spacer(),
             if (_msgs.isNotEmpty) GestureDetector(
@@ -90,14 +95,14 @@ class _AiScreenState extends State<AiScreen> with TickerProviderStateMixin {
             SizedBox(width: 8),
             Container(padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(gradient: LinearGradient(colors: [C.green.withOpacity(0.15), C.green.withOpacity(0.05)]), borderRadius: BorderRadius.circular(20)),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [Container(width: 6, height: 6, decoration: BoxDecoration(color: C.green, shape: BoxShape.circle)), SizedBox(width: 4), Text('Онлайн', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: C.green))])),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [Container(width: 6, height: 6, decoration: BoxDecoration(color: C.green, shape: BoxShape.circle)), SizedBox(width: 4), Text(l.t('online'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: C.green))])),
           ]),
         ),
         // Body
         Expanded(child: Container(
           decoration: BoxDecoration(
             gradient: isDark ? null : LinearGradient(colors: [Color(0xFFF0FAFB), Color(0xFFF5F7F8)], begin: Alignment.topCenter, end: Alignment.bottomCenter)),
-          child: _msgs.isEmpty ? _emptyState(isDark) : _messageList(isDark),
+          child: _msgs.isEmpty ? _emptyState(isDark, l) : _messageList(isDark),
         )),
         // Input
         Container(
@@ -107,7 +112,7 @@ class _AiScreenState extends State<AiScreen> with TickerProviderStateMixin {
             Expanded(child: Container(
               decoration: BoxDecoration(color: adaptiveSurface2(context), borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8)]),
               child: TextField(controller: _ctrl,
-                decoration: InputDecoration(hintText: 'Написать сообщение...', border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none, filled: false, contentPadding: EdgeInsets.symmetric(horizontal: 18, vertical: 12)),
+                decoration: InputDecoration(hintText: l.t('send_msg'), border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none, filled: false, contentPadding: EdgeInsets.symmetric(horizontal: 18, vertical: 12)),
                 onSubmitted: (_) => _send(), maxLines: 4, minLines: 1, onChanged: (_) => setState(() {})))),
             SizedBox(width: 10),
             GestureDetector(onTap: _send,
@@ -124,9 +129,9 @@ class _AiScreenState extends State<AiScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _emptyState(bool isDark) {
+  Widget _emptyState(bool isDark, L10n l) {
+    final tips = _tips(l);
     return FadeTransition(opacity: _fadeCtrl, child: Center(child: SingleChildScrollView(padding: EdgeInsets.all(28), child: Column(mainAxisSize: MainAxisSize.min, children: [
-      // Animated orb
       AnimatedBuilder(animation: _pulseCtrl, builder: (_, __) {
         final v = _pulseCtrl.value;
         return Container(width: 100, height: 100,
@@ -136,15 +141,14 @@ class _AiScreenState extends State<AiScreen> with TickerProviderStateMixin {
           child: Icon(Icons.auto_awesome, color: C.teal, size: 44));
       }),
       SizedBox(height: 24),
-      Text('Готов помочь!', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
+      Text(l.t('ready_help'), style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
       SizedBox(height: 8),
-      Text('Спрашивайте по материалам', style: TextStyle(fontSize: 15, color: C.teal, fontWeight: FontWeight.w500)),
+      Text(l.t('ask_ai'), style: TextStyle(fontSize: 15, color: C.teal, fontWeight: FontWeight.w500)),
       SizedBox(height: 32),
-      // Tips as bigger cards
       ...List.generate(2, (row) => Padding(padding: EdgeInsets.only(bottom: 10), child: Row(children: List.generate(2, (col) {
         final i = row * 2 + col;
-        final t = _tips[i];
-        return Expanded(child: Padding(padding: EdgeInsets.only(left: col == 1 ? 10 : 0, right: col == 0 ? 0 : 0),
+        final t = tips[i];
+        return Expanded(child: Padding(padding: EdgeInsets.only(left: col == 1 ? 10 : 0),
           child: GestureDetector(onTap: () => _send(t['text'] as String),
             child: AnimatedContainer(duration: Duration(milliseconds: 200), padding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(16),
