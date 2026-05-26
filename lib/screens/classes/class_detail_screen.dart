@@ -109,23 +109,48 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
           ),
         ],
         body: Column(children: [
-          Container(color: surfaceColor, child: TabBar(controller: _tabCtrl, labelColor: C.teal, unselectedLabelColor: C.text4, indicatorColor: C.teal, labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-            tabs: [Tab(text: 'Лекции (${_lectures.length})'), Tab(text: 'Материалы (${_materials.length})'), Tab(text: 'Задания'), Tab(text: 'AI Chat')])),
-          // Teacher action buttons below tabs
-          if (auth.isTeacher) Container(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8), color: surfaceColor,
-            child: Row(children: [
-              Expanded(child: OutlinedButton.icon(
-                icon: Icon(Icons.add, size: 16), label: Text('Assignment', style: TextStyle(fontSize: 13)),
-                onPressed: () => _createAssignment(),
-                style: OutlinedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 12)),
-              )),
-              SizedBox(width: 10),
-              Expanded(child: ElevatedButton.icon(
-                icon: Icon(Icons.add, size: 16, color: Colors.white), label: Text('Add', style: TextStyle(fontSize: 13)),
-                onPressed: () => _showAddMenu(),
-                style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 12)),
-              )),
+          Container(
+            color: surfaceColor,
+            child: Column(children: [
+              TabBar(
+                controller: _tabCtrl,
+                labelColor: C.teal,
+                unselectedLabelColor: C.text4,
+                indicatorColor: C.teal,
+                indicatorWeight: 2.5,
+                indicatorSize: TabBarIndicatorSize.label,
+                labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                unselectedLabelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                tabs: [
+                  Tab(text: 'Лекции (${_lectures.length})'),
+                  Tab(text: 'Материалы'),
+                  Tab(text: 'Задания'),
+                  Tab(text: 'AI Chat'),
+                ],
+              ),
+              if (auth.isTeacher) AnimatedBuilder(animation: _tabCtrl, builder: (ctx, _) {
+                if (_tabCtrl.index == 3) return SizedBox.shrink();
+                return Padding(
+                padding: EdgeInsets.fromLTRB(12, 8, 12, 10),
+                child: Row(children: [
+                  Expanded(child: GestureDetector(onTap: () => _createAssignment(),
+                    child: Container(padding: EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(color: adaptiveSurface2(context), borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: C.teal.withOpacity(0.3))),
+                      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        Icon(Icons.assignment_add, size: 16, color: C.teal), SizedBox(width: 6),
+                        Text('Задание', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: C.teal))])))),
+                  SizedBox(width: 10),
+                  Expanded(child: GestureDetector(onTap: () => _showAddMenu(),
+                    child: Container(padding: EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(gradient: LinearGradient(colors: [C.teal, C.tealDk]), borderRadius: BorderRadius.circular(12),
+                        boxShadow: [BoxShadow(color: C.teal.withOpacity(0.3), blurRadius: 8, offset: Offset(0, 3))]),
+                      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        Icon(Icons.add, size: 16, color: Colors.white), SizedBox(width: 6),
+                        Text('Добавить', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white))])))),
+                ]),
+              );
+              }),
             ]),
           ),
           Expanded(child: TabBarView(controller: _tabCtrl, children: [
@@ -144,58 +169,83 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
   Widget _postList(List<dynamic> posts, String type) {
     final surface = Theme.of(context).colorScheme.surface;
     final isTeacher = context.read<AuthProvider>().isTeacher;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     if (posts.isEmpty) return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Icon(type == 'lecture' ? Icons.menu_book_rounded : Icons.inventory_2_outlined, size: 48, color: C.teal),
-      SizedBox(height: 12), Text(type == 'lecture' ? 'No lectures yet' : 'No materials yet', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: C.text4)),
+      Container(width: 72, height: 72, decoration: BoxDecoration(color: C.teal.withOpacity(0.1), shape: BoxShape.circle),
+        child: Icon(type == 'lecture' ? Icons.menu_book_rounded : Icons.inventory_2_outlined, size: 32, color: C.teal)),
+      SizedBox(height: 16),
+      Text(type == 'lecture' ? 'Лекций ещё нет' : 'Материалов ещё нет', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: C.text4)),
     ]));
-
-    
-    
-
-    return ListView.builder(padding: EdgeInsets.fromLTRB(12, 4, 12, 90), itemCount: posts.length, itemBuilder: (ctx, i) {
+    return ListView.builder(padding: EdgeInsets.fromLTRB(12, 12, 12, 90), itemCount: posts.length, itemBuilder: (ctx, i) {
       final p = posts[i]; final files = _extractFiles(p);
       final body = _preview(p);
-      
-      
-      final num = posts.length - i; final ic = Icons.menu_book_rounded; final icColor = C.teal;
-
-      return GestureDetector(
-        onTap: () => _showPost(p, type),
-        child: Container(
-          margin: EdgeInsets.only(bottom: 14), padding: EdgeInsets.all(18),
-          decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(20)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Container(width: 50, height: 50, decoration: BoxDecoration(color: icColor.withOpacity(0.12), borderRadius: BorderRadius.circular(16)),
-              child: Icon(ic, color: icColor, size: 24)),
-            SizedBox(width: 14),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('${type == 'lecture' ? 'Lecture' : 'Material'}  $num', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: C.teal)),
-              SizedBox(height: 2),
-              Text(_clean(p['title'] ?? ''), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800), maxLines: 2, overflow: TextOverflow.ellipsis),
-              if (body.isNotEmpty) Padding(padding: EdgeInsets.only(top: 2), child: Text(body, style: TextStyle(fontSize: 13, color: C.text4), maxLines: 1, overflow: TextOverflow.ellipsis)),
-            ])),
-            if (isTeacher) ...[
-              _iconBtn(Icons.edit_outlined, () => _editPost(p)),
-              SizedBox(width: 4),
-              _iconBtn(Icons.delete_outline, () async { try { await context.read<ApiService>().deletePost(p['id']); _load(); } catch (_) {} }),
-            ],
-          ]),
-          SizedBox(height: 10),
-          Row(children: [
-            Icon(Icons.calendar_today, size: 12, color: C.text4), SizedBox(width: 4),
-            Text(_fmtDate(p['created_at'] ?? ''), style: TextStyle(fontSize: 12, color: C.text4)),
-            SizedBox(width: 12),
-            if (files.isNotEmpty) ...[Icon(Icons.description_outlined, size: 12, color: C.text4), SizedBox(width: 3), Text('${files.length} file${files.length > 1 ? 's' : ''}', style: TextStyle(fontSize: 12, color: C.text4))],
-            Spacer(),
-            GestureDetector(onTap: () => _showPost(p, type),
-              child: Row(children: [Text('Open', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: C.teal)), SizedBox(width: 2), Icon(Icons.arrow_forward, size: 16, color: C.teal)])),
-          ]),
-          SizedBox(height: 10),
-        ]),
-      ));
+      final num = posts.length - i;
+      return TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0.0, end: 1.0),
+        duration: Duration(milliseconds: 250 + i * 50),
+        curve: Curves.easeOutCubic,
+        builder: (_, t, child) => Transform.translate(offset: Offset(0, 16 * (1 - t)), child: Opacity(opacity: t, child: child)),
+        child: GestureDetector(
+          onTap: () => _showPost(p, type),
+          child: Container(
+            margin: EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: surface,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.15 : 0.05), blurRadius: 12, offset: Offset(0, 3))],
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Padding(padding: EdgeInsets.all(16), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Container(width: 52, height: 52,
+                  decoration: BoxDecoration(gradient: LinearGradient(colors: [C.teal.withOpacity(0.15), C.teal.withOpacity(0.05)]), borderRadius: BorderRadius.circular(16)),
+                  child: Stack(alignment: Alignment.center, children: [
+                    Icon(Icons.menu_book_rounded, color: C.teal, size: 22),
+                    Positioned(bottom: 4, right: 4, child: Container(width: 18, height: 18,
+                      decoration: BoxDecoration(color: C.teal, shape: BoxShape.circle),
+                      child: Center(child: Text('$num', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900))))),
+                  ])),
+                SizedBox(width: 14),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('${type == 'lecture' ? 'Лекция' : 'Материал'} $num',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: C.teal, letterSpacing: 0.5)),
+                  SizedBox(height: 3),
+                  Text(_clean(p['title'] ?? ''), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, height: 1.2), maxLines: 2, overflow: TextOverflow.ellipsis),
+                  if (body.isNotEmpty) Padding(padding: EdgeInsets.only(top: 4),
+                    child: Text(body, style: TextStyle(fontSize: 13, color: C.text4, height: 1.4), maxLines: 2, overflow: TextOverflow.ellipsis)),
+                ])),
+                if (isTeacher) Column(children: [
+                  _iconBtn(Icons.edit_outlined, () => _editPost(p)),
+                  SizedBox(height: 4),
+                  _iconBtn(Icons.delete_outline, () async { try { await context.read<ApiService>().deletePost(p['id']); _load(); } catch (_) {} }),
+                ]),
+              ])),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(color: adaptiveSurface2(context).withOpacity(0.5), borderRadius: BorderRadius.vertical(bottom: Radius.circular(20))),
+                child: Row(children: [
+                  Icon(Icons.calendar_today_outlined, size: 12, color: C.text4), SizedBox(width: 4),
+                  Text(_fmtDate(p['created_at'] ?? ''), style: TextStyle(fontSize: 12, color: C.text4)),
+                  if (files.isNotEmpty) ...[
+                    SizedBox(width: 10),
+                    Container(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(color: C.teal.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.attach_file, size: 11, color: C.teal), SizedBox(width: 3),
+                        Text('${files.length} файл', style: TextStyle(fontSize: 11, color: C.teal, fontWeight: FontWeight.w600))])),
+                  ],
+                  Spacer(),
+                  Row(children: [
+                    Text('Открыть', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: C.teal)),
+                    SizedBox(width: 4), Icon(Icons.arrow_forward_ios, size: 12, color: C.teal),
+                  ]),
+                ]),
+              ),
+            ]),
+          ),
+        ),
+      );
     });
   }
+
 
   Widget _iconBtn(IconData ic, VoidCallback onTap) => GestureDetector(onTap: onTap,
     child: Container(width: 34, height: 34, decoration: BoxDecoration(color: C.teal.withOpacity(0.08), borderRadius: BorderRadius.circular(10)),
@@ -235,44 +285,64 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
 
   // ── Assignments tab ──
   Widget _assignmentsTab(AuthProvider auth) {
-    if (_loadingAsg) return Center(child: CircularProgressIndicator(color: C.teal));
-    final surfaceColor = Theme.of(context).colorScheme.surface;
+    if (_loadingAsg) return Center(child: CircularProgressIndicator(color: C.teal, strokeWidth: 2.5));
+    final surface = Theme.of(context).colorScheme.surface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final avg = (_rating['avg_score'] ?? 0).round();
+    final pct = (_rating['avg_percent'] ?? 0).round();
+
     return ListView(padding: EdgeInsets.fromLTRB(12, 12, 12, 90), children: [
       // Rating card (students)
-      if (!auth.isTeacher && _rating.isNotEmpty) Container(
-        margin: EdgeInsets.only(bottom: 16), padding: EdgeInsets.all(16),
-        decoration: BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF007A8E), C.teal]), borderRadius: BorderRadius.circular(16)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('YOUR RATING', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1)),
-          SizedBox(height: 6),
-          Row(children: [
+      if (!auth.isTeacher && _rating.isNotEmpty) TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0.0, end: 1.0), duration: Duration(milliseconds: 400), curve: Curves.easeOutCubic,
+        builder: (_, t, __) => Transform.translate(offset: Offset(0, 20 * (1 - t)), child: Opacity(opacity: t, child: Container(
+          margin: EdgeInsets.only(bottom: 16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: [Color(0xFF006475), C.teal, Color(0xFF00C9D4)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [BoxShadow(color: C.teal.withOpacity(0.4), blurRadius: 20, offset: Offset(0, 6))],
+          ),
+          padding: EdgeInsets.all(20),
+          child: Row(children: [
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('PERFORMANCE', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1)),
+              Row(children: [
+                Container(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
+                  child: Text('МОЙ РЕЙТИНГ', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1))),
+              ]),
+              SizedBox(height: 12),
+              RichText(text: TextSpan(children: [
+                TextSpan(text: '$avg', style: TextStyle(color: Colors.white, fontSize: 44, fontWeight: FontWeight.w900, height: 1)),
+                TextSpan(text: ' /100', style: TextStyle(color: Colors.white60, fontSize: 16, fontWeight: FontWeight.w600)),
+              ])),
+              SizedBox(height: 8),
+              ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(
+                value: avg / 100, backgroundColor: Colors.white24, color: Colors.white, minHeight: 4)),
               SizedBox(height: 6),
+              Text('Успеваемость: $pct%', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500)),
             ])),
             SizedBox(width: 16),
-            RichText(text: TextSpan(children: [
-              TextSpan(text: '${(_rating['avg_score'] ?? 0).round()}', style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900)),
-              TextSpan(text: '/100', style: TextStyle(color: Colors.white60, fontSize: 14)),
-            ])),
+            Container(width: 64, height: 64, decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), shape: BoxShape.circle),
+              child: Icon(avg >= 80 ? Icons.emoji_events_rounded : avg >= 60 ? Icons.star_rounded : Icons.trending_up_rounded,
+                color: Colors.white, size: 32)),
           ]),
-          SizedBox(height: 4),
-          Align(alignment: Alignment.centerRight, child: Text('${(_rating['avg_percent'] ?? 0).round()}%', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700))),
-        ]),
-      ),
+        )))),
       // Header
       Row(children: [
-        Text('Lab Work', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+        Text('Задания', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
         Spacer(),
-        Row(children: [Icon(Icons.sort, size: 14, color: C.text4), SizedBox(width: 4), Text('SORT: BY DEADLINE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: C.text4, letterSpacing: 0.5))]),
+        Container(padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: adaptiveSurface2(context), borderRadius: BorderRadius.circular(10)),
+          child: Row(children: [Icon(Icons.sort_rounded, size: 14, color: C.text4), SizedBox(width: 4), Text('По дедлайну', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: C.text4))])),
       ]),
       SizedBox(height: 12),
-      if (_assignments.isEmpty) Container(padding: EdgeInsets.all(40), child: Center(child: Column(children: [
-        Icon(Icons.assignment_outlined, size: 48, color: C.teal), SizedBox(height: 8),
-        Text('Нет заданий', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: C.text3)),
+      if (_assignments.isEmpty) Container(padding: EdgeInsets.symmetric(vertical: 48), child: Center(child: Column(children: [
+        Container(width: 64, height: 64, decoration: BoxDecoration(color: C.teal.withOpacity(0.1), shape: BoxShape.circle),
+          child: Icon(Icons.assignment_outlined, size: 30, color: C.teal)),
+        SizedBox(height: 12),
+        Text('Нет заданий', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: C.text4)),
       ]))),
       // Assignment cards
-      ..._assignments.map((a) {
+      ..._assignments.asMap().entries.map((entry) {
+        final i = entry.key; final a = entry.value;
         final sub = _subFor(a['id']);
         final status = sub?['status'];
         final grade = sub?['grade'];
@@ -281,40 +351,78 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
         final deadline = a['deadline'];
         final isLate = deadline != null && DateTime.tryParse(deadline)?.isBefore(DateTime.now()) == true && sub == null;
 
-        return Container(
-          margin: EdgeInsets.only(bottom: 12), padding: EdgeInsets.all(16),
-          decoration: BoxDecoration(color: surfaceColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.3))),
-          child: InkWell(onTap: () => _showAssignment(a, sub), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Container(width: 42, height: 42, decoration: BoxDecoration(
-              color: isGraded ? C.greenLt : isLate ? C.redLt : adaptiveTealLt(context), borderRadius: BorderRadius.circular(12)),
-              child: Icon(isGraded ? Icons.check_circle : isLate ? Icons.warning : Icons.edit_note,
-                color: isGraded ? C.green : isLate ? C.red : C.teal, size: 20)),
-            SizedBox(width: 12),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Expanded(child: Text(a['title'] ?? '', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
-                SizedBox(width: 8),
-                Container(padding: EdgeInsets.symmetric(horizontal: 10, vertical: 3), decoration: BoxDecoration(
-                  color: isGraded ? C.greenLt : isSubmitted ? adaptiveTealLt(context) : isLate ? C.redLt : adaptiveSurface2(context), borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: isGraded ? C.green.withOpacity(0.3) : isLate ? C.red.withOpacity(0.3) : adaptiveBorder(context))),
-                  child: Text(isGraded ? 'GRADED' : isSubmitted ? 'SUBMITTED' : isLate ? 'OVERDUE' : 'NEW', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: isGraded ? C.green : isSubmitted ? C.teal : isLate ? C.red : C.text4))),
+        Color statusColor = isGraded ? C.green : isSubmitted ? C.teal : isLate ? C.red : C.text4;
+        Color statusBg = isGraded ? C.greenLt : isSubmitted ? adaptiveTealLt(context) : isLate ? C.redLt : adaptiveSurface2(context);
+        String statusText = isGraded ? 'ОЦЕНЕНО' : isSubmitted ? 'СДАНО' : isLate ? 'ПРОСРОЧЕНО' : 'НОВОЕ';
+        IconData statusIcon = isGraded ? Icons.check_circle_rounded : isSubmitted ? Icons.upload_file : isLate ? Icons.schedule_rounded : Icons.edit_note_rounded;
+
+        return TweenAnimationBuilder<double>(
+          key: ValueKey(a['id']),
+          tween: Tween(begin: 0.0, end: 1.0),
+          duration: Duration(milliseconds: 250 + i * 60),
+          curve: Curves.easeOutCubic,
+          builder: (_, t, child) => Transform.translate(offset: Offset(0, 16 * (1 - t)), child: Opacity(opacity: t, child: child)),
+          child: GestureDetector(
+            onTap: () => _showAssignment(a, sub),
+            child: Container(
+              margin: EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: surface,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.15 : 0.04), blurRadius: 10, offset: Offset(0, 2))],
+              ),
+              child: Column(children: [
+                Padding(padding: EdgeInsets.all(16), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Container(width: 48, height: 48,
+                    decoration: BoxDecoration(color: statusColor.withOpacity(0.12), borderRadius: BorderRadius.circular(14)),
+                    child: Icon(statusIcon, color: statusColor, size: 22)),
+                  SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      Expanded(child: Text(a['title'] ?? '', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800), maxLines: 2, overflow: TextOverflow.ellipsis)),
+                      SizedBox(width: 8),
+                      Container(padding: EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                        decoration: BoxDecoration(color: statusBg, borderRadius: BorderRadius.circular(20)),
+                        child: Text(statusText, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: statusColor))),
+                    ]),
+                    if (a['description'] != null && a['description'].toString().isNotEmpty)
+                      Padding(padding: EdgeInsets.only(top: 4),
+                        child: Text(a['description'], style: TextStyle(fontSize: 13, color: C.text4), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                    SizedBox(height: 10),
+                    Wrap(spacing: 12, children: [
+                      if (deadline != null) Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(Icons.calendar_today_outlined, size: 12, color: isLate ? C.red : C.text4), SizedBox(width: 4),
+                        Text(_fmtDate(deadline), style: TextStyle(fontSize: 12, color: isLate ? C.red : C.text4, fontWeight: FontWeight.w500)),
+                      ]),
+                      Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(Icons.star_rounded, size: 14, color: C.teal), SizedBox(width: 3),
+                        Text('${a['max_score'] ?? 100} баллов', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: C.teal)),
+                      ]),
+                      if (grade != null) Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(Icons.check_circle_rounded, size: 12, color: C.green), SizedBox(width: 3),
+                        Text('${grade['score']}/${a['max_score']}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: C.green)),
+                      ]),
+                    ]),
+                  ])),
+                ])),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(color: adaptiveSurface2(context).withOpacity(0.4), borderRadius: BorderRadius.vertical(bottom: Radius.circular(18))),
+                  child: Row(children: [
+                    Icon(Icons.touch_app_outlined, size: 13, color: C.text4), SizedBox(width: 4),
+                    Text('Нажмите для подробностей', style: TextStyle(fontSize: 12, color: C.text4)),
+                    Spacer(),
+                    Icon(Icons.arrow_forward_ios, size: 12, color: C.teal),
+                  ]),
+                ),
               ]),
-              if (a['description'] != null) Padding(padding: EdgeInsets.only(top: 4), child: Text(a['description'], style: TextStyle(fontSize: 13, color: C.text4), maxLines: 1, overflow: TextOverflow.ellipsis)),
-              SizedBox(height: 8),
-              Row(children: [
-                if (deadline != null) ...[Icon(Icons.calendar_today, size: 12, color: C.text4), SizedBox(width: 4), Text(_fmtDate(deadline), style: TextStyle(fontSize: 12, color: C.text4, fontWeight: FontWeight.w500)), SizedBox(width: 12)],
-                Icon(Icons.star_border, size: 14, color: C.teal), SizedBox(width: 4),
-                Text('${a['max_score'] ?? 100} PTS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: C.teal)),
-                if (grade != null) ...[SizedBox(width: 12), Text('Score: ${grade['score']}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: C.green))],
-              ]),
-              SizedBox(height: 6),
-              Align(alignment: Alignment.centerRight, child: Text('Preview assignment', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: C.teal))),
-            ])),
-          ])),
+            ),
+          ),
         );
       }),
     ]);
   }
+
 
   // ── AI Chat tab ──
   Widget _aiTab() => _AiChat(classId: widget.classId, className: _title);
@@ -623,6 +731,7 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
   void _showAddMenu() {
     String type = 'lecture';
     final tc = TextEditingController(), cc = TextEditingController();
+    List<PlatformFile> lectureFiles = [];
     showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Theme.of(context).colorScheme.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => Padding(
@@ -659,6 +768,22 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
           _fieldLabel2('СОДЕРЖАНИЕ ${type == 'lecture' ? 'ЛЕКЦИИ' : 'МАТЕРИАЛА'}'),
           TextField(controller: cc, decoration: InputDecoration(hintText: 'Текст лекции, ссылки на видео...'), maxLines: 4),
           SizedBox(height: 20),
+          // File upload
+          _fieldLabel2('ПРИКРЕПИТЬ ФАЙЛЫ'),
+          GestureDetector(onTap: () async {
+            final result = await FilePicker.platform.pickFiles(allowMultiple: true, type: FileType.any);
+            if (result != null) setS(() => lectureFiles.addAll(result.files));
+          }, child: Container(padding: EdgeInsets.all(20), decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: C.teal.withOpacity(0.3))),
+            child: Column(children: [
+              Icon(Icons.upload_outlined, size: 24, color: C.teal), SizedBox(height: 6),
+              RichText(text: TextSpan(style: TextStyle(fontSize: 13, color: C.text4), children: [TextSpan(text: 'Нажмите или '), TextSpan(text: 'выберите файлы', style: TextStyle(fontWeight: FontWeight.w700, color: C.teal))])),
+              Text('PDF, DOCX, PPT, изображения', style: TextStyle(fontSize: 10, color: C.text4)),
+            ]))),
+          if (lectureFiles.isNotEmpty) ...[SizedBox(height: 8),
+            ...lectureFiles.map((f) => Container(margin: EdgeInsets.only(bottom: 4), padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(color: C.teal.withOpacity(0.06), borderRadius: BorderRadius.circular(10)),
+              child: Row(children: [Icon(Icons.description, size: 14, color: C.teal), SizedBox(width: 6), Expanded(child: Text(f.name, style: TextStyle(fontSize: 12, color: C.teal), overflow: TextOverflow.ellipsis)), GestureDetector(onTap: () => setS(() => lectureFiles.remove(f)), child: Icon(Icons.close, size: 14, color: C.text4))])))],
+          SizedBox(height: 20),
           Row(children: [
             Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(ctx), child: Text('Отмена'), style: OutlinedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14)))),
             SizedBox(width: 12),
@@ -681,6 +806,7 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
     DateTime? deadline;
     List<Map<String, dynamic>> criteria = [{'name': '', 'weight': 100, 'desc': ''}];
     List<PlatformFile> attachedFiles = [];
+    List<PlatformFile> referenceFiles = [];
 
     showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Theme.of(context).colorScheme.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
@@ -746,6 +872,38 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
                 GestureDetector(onTap: () => setS(() => attachedFiles.removeWhere((x) => x.name == f.name)),
                   child: Icon(Icons.close, size: 14, color: C.text4)),
               ]))),
+          SizedBox(height: 20),
+          // Reference solution
+          Container(padding: EdgeInsets.all(16), decoration: BoxDecoration(color: C.teal.withOpacity(0.04), borderRadius: BorderRadius.circular(16), border: Border.all(color: C.teal.withOpacity(0.15))),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Container(width: 36, height: 36, decoration: BoxDecoration(color: C.teal.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+                  child: Icon(Icons.check_circle_outline, size: 18, color: C.teal)),
+                SizedBox(width: 10),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [Text('Эталонные решения', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)), Spacer(), Container(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: C.teal.withOpacity(0.1), borderRadius: BorderRadius.circular(8)), child: Text('ИИ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: C.teal)))]),
+                  Text('ИИ сравнит работы учеников с эталоном', style: TextStyle(fontSize: 11, color: C.text4)),
+                ])),
+              ]),
+              SizedBox(height: 12),
+              GestureDetector(onTap: () async {
+                final result = await FilePicker.platform.pickFiles(allowMultiple: true, type: FileType.any);
+                if (result != null) setS(() => referenceFiles.addAll(result.files));
+              },
+              child: Container(padding: EdgeInsets.all(20), decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: C.teal.withOpacity(0.3))),
+                child: Column(children: [
+                  Icon(Icons.upload_outlined, size: 28, color: C.teal),
+                  SizedBox(height: 6),
+                  RichText(text: TextSpan(style: TextStyle(fontSize: 13, color: C.text4), children: [TextSpan(text: 'Нажмите или '), TextSpan(text: 'выберите файлы', style: TextStyle(fontWeight: FontWeight.w700, color: C.teal))])),
+                  Text('PDF, DOCX, DOC, PPTX, XLSX, TXT, MD', style: TextStyle(fontSize: 10, color: C.text4)),
+                ]))),
+              if (referenceFiles.isNotEmpty) ...[
+                SizedBox(height: 8),
+                ...referenceFiles.map((f) => Container(margin: EdgeInsets.only(bottom: 4), padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(color: C.teal.withOpacity(0.06), borderRadius: BorderRadius.circular(10)),
+                  child: Row(children: [Icon(Icons.description, size: 14, color: C.teal), SizedBox(width: 6), Expanded(child: Text(f.name, style: TextStyle(fontSize: 12, color: C.teal), overflow: TextOverflow.ellipsis)), GestureDetector(onTap: () => setS(() => referenceFiles.remove(f)), child: Icon(Icons.close, size: 14, color: C.text4))]))),
+              ],
+            ])),
           SizedBox(height: 20),
           // Criteria
           Row(children: [
@@ -918,8 +1076,10 @@ class _AiChatState extends State<_AiChat> {
   final List<Map<String, String>> _msgs = [];
   bool _loading = false;
 
-  void _send() async {
-    final text = _ctrl.text.trim(); if (text.isEmpty || _loading) return;
+  final _tips = ['Объясни материал', 'Ключевые понятия', 'Помощь с заданием', 'Частые ошибки'];
+
+  void _send([String? override]) async {
+    final text = override ?? _ctrl.text.trim(); if (text.isEmpty || _loading) return;
     setState(() { _msgs.add({'role': 'user', 'text': text}); _loading = true; }); _ctrl.clear();
     Future.delayed(Duration(milliseconds: 100), () { if (_scroll.hasClients) _scroll.animateTo(_scroll.position.maxScrollExtent, duration: Duration(milliseconds: 200), curve: Curves.easeOut); });
     try {
@@ -935,22 +1095,56 @@ class _AiChatState extends State<_AiChat> {
   }
 
   @override Widget build(BuildContext context) {
+    final surface = Theme.of(context).colorScheme.surface;
     return Column(children: [
       Expanded(child: _msgs.isEmpty
-        ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [Container(width: 60, height: 60, decoration: BoxDecoration(color: adaptiveTealLt(context), borderRadius: BorderRadius.circular(18)), child: Icon(Icons.auto_awesome, color: C.teal, size: 28)), SizedBox(height: 12), Text('AI Ассистент', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: C.text3))]))
-        : ListView.builder(controller: _scroll, padding: EdgeInsets.all(12), itemCount: _msgs.length + (_loading ? 1 : 0), itemBuilder: (ctx, i) {
-            if (i == _msgs.length) return Align(alignment: Alignment.centerLeft, child: Container(margin: EdgeInsets.only(top: 8), padding: EdgeInsets.all(12), decoration: BoxDecoration(color: adaptiveSurface2(context), borderRadius: BorderRadius.circular(14)), child: SizedBox(width: 40, height: 20, child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: C.teal)))));
+        ? Center(child: SingleChildScrollView(padding: EdgeInsets.all(20), child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(width: 70, height: 70, decoration: BoxDecoration(color: C.teal.withOpacity(0.1), shape: BoxShape.circle),
+              child: Icon(Icons.bolt, color: C.teal, size: 34)),
+            SizedBox(height: 16),
+            Text('Готов помочь!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+            SizedBox(height: 6),
+            Text('Спрашивайте по материалам курса', style: TextStyle(fontSize: 13, color: C.teal)),
+            SizedBox(height: 20),
+            Wrap(alignment: WrapAlignment.center, spacing: 8, runSpacing: 8, children: _tips.map((t) => GestureDetector(
+              onTap: () => _send(t),
+              child: Container(padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: adaptiveBorder(context))),
+                child: Text(t, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500))))).toList()),
+          ])))
+        : ListView.builder(controller: _scroll, padding: EdgeInsets.fromLTRB(14, 12, 14, 8), itemCount: _msgs.length + (_loading ? 1 : 0), itemBuilder: (ctx, i) {
+            if (i == _msgs.length) return Padding(padding: EdgeInsets.only(bottom: 8), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Container(width: 28, height: 28, decoration: BoxDecoration(color: C.teal.withOpacity(0.12), borderRadius: BorderRadius.circular(8)), child: Icon(Icons.auto_awesome, size: 14, color: C.teal)),
+              SizedBox(width: 10),
+              Container(padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10), decoration: BoxDecoration(color: adaptiveSurface2(context), borderRadius: BorderRadius.circular(14)),
+                child: SizedBox(width: 40, height: 16, child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: C.teal)))),
+            ]));
             final m = _msgs[i]; final isU = m['role'] == 'user';
-            return Align(alignment: isU ? Alignment.centerRight : Alignment.centerLeft, child: Container(margin: EdgeInsets.only(bottom: 8), padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10), constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-              decoration: BoxDecoration(color: isU ? C.teal : adaptiveSurface2(context), borderRadius: BorderRadius.circular(14).copyWith(bottomRight: isU ? Radius.circular(4) : null, bottomLeft: !isU ? Radius.circular(4) : null)),
-              child: SelectableText(m['text'] ?? '', style: TextStyle(fontSize: 14, color: isU ? Colors.white : Theme.of(context).textTheme.bodyLarge?.color, height: 1.5))));
+            if (isU) return Padding(padding: EdgeInsets.only(bottom: 14), child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+              Flexible(child: Container(padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(gradient: LinearGradient(colors: [C.teal, C.tealDk]), borderRadius: BorderRadius.only(topLeft: Radius.circular(18), topRight: Radius.circular(18), bottomLeft: Radius.circular(18), bottomRight: Radius.circular(4)),
+                  boxShadow: [BoxShadow(color: C.teal.withOpacity(0.2), blurRadius: 10, offset: Offset(0, 3))]),
+                child: Text(m['text'] ?? '', style: TextStyle(fontSize: 14, color: Colors.white, height: 1.5))))]));
+            return Padding(padding: EdgeInsets.only(bottom: 14), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Container(width: 28, height: 28, margin: EdgeInsets.only(top: 2), decoration: BoxDecoration(color: C.teal.withOpacity(0.12), borderRadius: BorderRadius.circular(8)), child: Icon(Icons.auto_awesome, size: 14, color: C.teal)),
+              SizedBox(width: 10),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('AI', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: C.teal)),
+                SizedBox(height: 3),
+                SelectableText(m['text'] ?? '', style: TextStyle(fontSize: 14, height: 1.6)),
+              ])),
+            ]));
           })),
-      Container(padding: EdgeInsets.fromLTRB(12, 8, 12, 88), decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, border: Border(top: BorderSide(color: Theme.of(context).dividerColor))),
+      // Input
+      Container(padding: EdgeInsets.fromLTRB(12, 8, 12, 4), decoration: BoxDecoration(color: surface),
         child: Row(children: [
-          Expanded(child: TextField(controller: _ctrl, decoration: InputDecoration(hintText: 'Спросите...', border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: adaptiveBorder(context))), contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10)), onSubmitted: (_) => _send())),
+          Expanded(child: Container(decoration: BoxDecoration(color: adaptiveSurface2(context), borderRadius: BorderRadius.circular(22)),
+            child: TextField(controller: _ctrl, decoration: InputDecoration(hintText: 'Спросите...', border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none, filled: false, contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10)), onSubmitted: (_) => _send(), maxLines: 3, minLines: 1))),
           SizedBox(width: 8),
-          Container(width: 44, height: 44, decoration: BoxDecoration(color: C.teal, borderRadius: BorderRadius.circular(12)),
-            child: IconButton(onPressed: _send, icon: Icon(Icons.send, color: Colors.white, size: 20))),
+          GestureDetector(onTap: _send, child: Container(width: 44, height: 44,
+            decoration: BoxDecoration(gradient: LinearGradient(colors: [C.teal, C.tealDk]), borderRadius: BorderRadius.circular(14),
+              boxShadow: [BoxShadow(color: C.teal.withOpacity(0.3), blurRadius: 8, offset: Offset(0, 3))]),
+            child: Icon(Icons.send_rounded, color: Colors.white, size: 20))),
         ])),
     ]);
   }

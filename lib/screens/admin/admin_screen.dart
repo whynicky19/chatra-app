@@ -19,7 +19,7 @@ class _AdminState extends State<AdminScreen> with SingleTickerProviderStateMixin
   String _search = '';
   int _totalTokens = 0;
 
-  @override void initState() { super.initState(); _tabCtrl = TabController(length: 2, vsync: this); _tabCtrl.addListener(() { if (_tabCtrl.index == 1 && _aiSummary.isEmpty) _loadAi(); }); _load(); }
+  @override void initState() { super.initState(); _tabCtrl = TabController(length: 2, vsync: this); _load(); _loadAi(); }
 
   Future<void> _load() async {
     setState(() => _loading = true);
@@ -44,40 +44,63 @@ class _AdminState extends State<AdminScreen> with SingleTickerProviderStateMixin
   @override
   Widget build(BuildContext context) {
     final surface = Theme.of(context).colorScheme.surface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final teacherCount = _users.where((u) => u['role'] == 'teacher').length;
+    final studentCount = _users.where((u) => u['role'] == 'student').length;
+
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(child: Column(children: [
-        Padding(padding: EdgeInsets.fromLTRB(20, 20, 20, 0), child: Row(children: [
-          Icon(Icons.shield_outlined, color: C.teal, size: 22), SizedBox(width: 8),
-          Text('Admin Panel', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+        // Header
+        Padding(padding: EdgeInsets.fromLTRB(20, 20, 20, 16), child: Row(children: [
+          Container(width: 44, height: 44, decoration: BoxDecoration(gradient: LinearGradient(colors: [C.teal, C.tealDk]), borderRadius: BorderRadius.circular(14),
+            boxShadow: [BoxShadow(color: C.teal.withOpacity(0.35), blurRadius: 10, offset: Offset(0, 4))]),
+            child: Icon(Icons.shield_rounded, color: Colors.white, size: 22)),
+          SizedBox(width: 12),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Панель Админа', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: C.teal)),
+            Text('Управление пользователями', style: TextStyle(fontSize: 12, color: C.text4)),
+          ]),
         ])),
-        SizedBox(height: 12),
-        // Stats
-        Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Row(children: [
-          _stat(Icons.people_outline, '${_users.length}', 'Users'),
+        // Stats row
+        Padding(padding: EdgeInsets.fromLTRB(16, 0, 16, 12), child: Row(children: [
+          _stat(Icons.people_rounded, '${_users.length}', 'Всего', C.teal),
           SizedBox(width: 8),
-          _stat(Icons.school_outlined, '${_users.where((u) => u['role'] == 'teacher').length}', 'Teachers'),
+          _stat(Icons.school_rounded, '$teacherCount', 'Учителей', Color(0xFF6366F1)),
           SizedBox(width: 8),
-          _stat(Icons.person_outline, '${_users.where((u) => u['role'] == 'student').length}', 'Students'),
+          _stat(Icons.person_rounded, '$studentCount', 'Студентов', Color(0xFF059669)),
         ])),
-        SizedBox(height: 12),
         // Tabs
         Container(margin: EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(14)),
-          child: TabBar(controller: _tabCtrl, labelColor: C.teal, unselectedLabelColor: C.text4, indicatorColor: C.teal, indicatorSize: TabBarIndicatorSize.tab,
+          decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(16)),
+          child: TabBar(
+            controller: _tabCtrl,
+            labelColor: C.teal, unselectedLabelColor: C.text4,
+            indicatorColor: C.teal, indicatorSize: TabBarIndicatorSize.label,
             labelStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-            tabs: [Tab(text: 'Users'), Tab(text: 'AI Usage')])),
+            tabs: [Tab(text: 'Пользователи'), Tab(text: 'AI Использование')])),
         SizedBox(height: 8),
         Expanded(child: TabBarView(controller: _tabCtrl, children: [_usersTab(), _aiTab()])),
       ])),
-      floatingActionButton: Padding(padding: EdgeInsets.only(bottom: 76), child: FloatingActionButton(backgroundColor: C.teal, child: Icon(Icons.person_add, color: Colors.white), onPressed: _showCreateDialog)),
+      floatingActionButton: Padding(padding: EdgeInsets.only(bottom: 76),
+        child: FloatingActionButton(
+          backgroundColor: C.teal,
+          child: Icon(Icons.person_add_rounded, color: Colors.white),
+          onPressed: _showCreateDialog,
+        )),
     );
   }
 
-  Widget _stat(IconData ic, String val, String label) => Expanded(child: Container(
-    padding: EdgeInsets.all(14), decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(16)),
+  Widget _stat(IconData ic, String val, String label, Color color) => Expanded(child: Container(
+    padding: EdgeInsets.all(14),
+    decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(16),
+      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: Offset(0, 2))]),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Icon(ic, size: 18, color: C.teal), SizedBox(height: 6),
-      Text(val, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)), Text(label, style: TextStyle(fontSize: 11, color: C.text4)),
+      Container(width: 32, height: 32, decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+        child: Icon(ic, size: 16, color: color)),
+      SizedBox(height: 8),
+      Text(val, style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
+      Text(label, style: TextStyle(fontSize: 11, color: C.text4, fontWeight: FontWeight.w500)),
     ])));
 
   Widget _usersTab() {
@@ -94,14 +117,20 @@ class _AdminState extends State<AdminScreen> with SingleTickerProviderStateMixin
             return AnimatedContainer(duration: Duration(milliseconds: 200), margin: EdgeInsets.only(bottom: 8), padding: EdgeInsets.all(14),
               decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(16)),
               child: Row(children: [
-                CircleAvatar(radius: 20, backgroundColor: C.teal.withOpacity(0.15), child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: TextStyle(color: C.teal, fontWeight: FontWeight.w800, fontSize: 16))),
+                Container(width: 44, height: 44,
+                  decoration: BoxDecoration(gradient: RadialGradient(colors: [C.teal.withOpacity(0.25), C.teal.withOpacity(0.08)]), shape: BoxShape.circle),
+                  child: Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: TextStyle(color: C.teal, fontWeight: FontWeight.w900, fontSize: 17)))),
                 SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(name, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)), SizedBox(height: 2),
+                  Text(name, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)), SizedBox(height: 2),
                   Text(u['email'] ?? '', style: TextStyle(fontSize: 12, color: C.text4)),
                 ])),
-                Container(padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: u['role'] == 'admin' ? adaptiveTealLt(context) : adaptiveSurface2(context), borderRadius: BorderRadius.circular(20)),
-                  child: Text(u['role'] ?? '', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: u['role'] == 'admin' ? C.teal : C.text4))),
+                Container(padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: u['role'] == 'admin' ? C.teal.withOpacity(0.12) : u['role'] == 'teacher' ? Color(0xFF6366F1).withOpacity(0.1) : adaptiveSurface2(context),
+                    borderRadius: BorderRadius.circular(20)),
+                  child: Text(u['role'] ?? '', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+                    color: u['role'] == 'admin' ? C.teal : u['role'] == 'teacher' ? Color(0xFF6366F1) : C.text4))),
                 PopupMenuButton<String>(icon: Icon(Icons.more_vert, size: 20, color: C.text4), onSelected: (v) => _action(u, v), itemBuilder: (_) => [
                   PopupMenuItem(value: 'student', child: Text('Set Student')), PopupMenuItem(value: 'teacher', child: Text('Set Teacher')),
                   PopupMenuItem(value: 'admin', child: Text('Set Admin')), PopupMenuDivider(),
@@ -115,49 +144,63 @@ class _AdminState extends State<AdminScreen> with SingleTickerProviderStateMixin
 
   Widget _aiTab() {
     final surface = Theme.of(context).colorScheme.surface;
+    final fill = adaptiveSurface2(context);
     return ListView(padding: EdgeInsets.fromLTRB(16, 8, 16, 90), children: [
-      // Total tokens
-      Container(padding: EdgeInsets.all(16), decoration: BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF006475), C.teal]), borderRadius: BorderRadius.circular(16)),
-        child: Row(children: [
-          Icon(Icons.bolt, color: Colors.white, size: 24), SizedBox(width: 12),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Total Tokens', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700)),
-            Text(_fmtTokens(_totalTokens), style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900)),
+      // Per-class summary cards (horizontal scroll)
+      if (_aiSummary.isNotEmpty) ...[
+        SizedBox(height: 72, child: ListView(scrollDirection: Axis.horizontal, children: _aiSummary.map((s) => Container(
+          width: 150, margin: EdgeInsets.only(right: 8), padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: C.teal.withOpacity(0.2))),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
+            Row(children: [Icon(Icons.bolt, size: 11, color: C.teal), SizedBox(width: 3),
+              Flexible(child: Text(s['class_name'] ?? (s['class_id'] != null ? '#${s['class_id']}' : 'Общий'), style: TextStyle(fontSize: 9, color: C.teal, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis))]),
+            Text(_fmtTokens(s['total_tokens'] ?? 0), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+            Text('${s['request_count'] ?? 0} запр.', style: TextStyle(fontSize: 9, color: C.text4)),
           ]),
+        )).toList())),
+        SizedBox(height: 12),
+      ],
+      // Total + refresh
+      Container(padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10), decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(14)),
+        child: Row(children: [
+          Icon(Icons.bolt, size: 16, color: C.teal), SizedBox(width: 8),
+          Text('Итого: ', style: TextStyle(fontSize: 13, color: C.text4)),
+          Text('${_fmtTokens(_totalTokens)} токенов', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: C.teal)),
           Spacer(),
-          IconButton(icon: Icon(Icons.refresh, color: Colors.white70), onPressed: _loadAi),
+          GestureDetector(onTap: _loadAi, child: Row(children: [Icon(Icons.refresh, size: 16, color: C.text4), SizedBox(width: 4), Text('Обновить', style: TextStyle(fontSize: 12, color: C.text4))])),
         ])),
       SizedBox(height: 16),
-      // Per-class summary
-      if (_aiSummary.isNotEmpty) ...[
-        Text('By Class', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: C.text3)), SizedBox(height: 8),
-        Wrap(spacing: 8, runSpacing: 8, children: _aiSummary.map((s) => Container(
-          width: (MediaQuery.of(context).size.width - 48) / 2, padding: EdgeInsets.all(14),
-          decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: C.teal.withOpacity(0.2))),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [Icon(Icons.bolt, size: 14, color: C.teal), SizedBox(width: 4), Text(s['class_name'] ?? 'Class #${s['class_id'] ?? 'General'}', style: TextStyle(fontSize: 11, color: C.teal, fontWeight: FontWeight.w700))]),
-            SizedBox(height: 6),
-            Text(_fmtTokens(s['total_tokens'] ?? 0), style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-            Text('tokens', style: TextStyle(fontSize: 11, color: C.text4)),
-            Text('${s['request_count'] ?? 0} requests', style: TextStyle(fontSize: 11, color: C.text4)),
-          ]),
-        )).toList()),
-        SizedBox(height: 16),
-      ],
-      // Recent logs
+      // Detailed log table
       if (_aiLogs.isNotEmpty) ...[
-        Text('Recent Requests', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: C.text3)), SizedBox(height: 8),
-        ..._aiLogs.take(20).map((l) => Container(
-          margin: EdgeInsets.only(bottom: 6), padding: EdgeInsets.all(12),
-          decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(14)),
+        // Table header
+        Container(padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(children: [
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(l['user_name'] ?? l['user_email'] ?? '#${l['user_id']}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              Text(l['created_at'] ?? '', style: TextStyle(fontSize: 11, color: C.text4)),
-            ])),
-            Container(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(color: adaptiveTealLt(context), borderRadius: BorderRadius.circular(8)),
-              child: Text('${l['total_tokens'] ?? 0} tok', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: C.teal))),
-          ]))),
+            SizedBox(width: 24, child: Text('#', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: C.text4))),
+            Expanded(flex: 3, child: Text('ПОЛЬЗОВАТЕЛЬ', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: C.text4))),
+            Expanded(flex: 2, child: Text('ТИП', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: C.text4))),
+            SizedBox(width: 60, child: Text('ТОКЕНЫ', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: C.text4), textAlign: TextAlign.right)),
+          ])),
+        // Table rows
+        ...List.generate(_aiLogs.length > 30 ? 30 : _aiLogs.length, (i) {
+          final l = _aiLogs[i];
+          final isGrade = (l['type'] ?? '').toString().contains('grade') || (l['type'] ?? '').toString().contains('check');
+          return Container(
+            margin: EdgeInsets.only(bottom: 4), padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(12)),
+            child: Row(children: [
+              SizedBox(width: 24, child: Text('${i + 1}', style: TextStyle(fontSize: 11, color: C.text4))),
+              Expanded(flex: 3, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(l['user_name'] ?? l['user_email'] ?? '#${l['user_id']}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
+                Text(l['created_at'] ?? '', style: TextStyle(fontSize: 9, color: C.text4)),
+              ])),
+              Expanded(flex: 2, child: Row(children: [
+                Container(padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: isGrade ? C.teal.withOpacity(0.1) : C.green.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
+                  child: Text(isGrade ? 'Проверка' : 'Чат', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isGrade ? C.teal : C.green))),
+              ])),
+              SizedBox(width: 60, child: Text('${l['total_tokens'] ?? 0}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: C.teal), textAlign: TextAlign.right)),
+            ]),
+          );
+        }),
       ],
       if (_aiSummary.isEmpty && _aiLogs.isEmpty) Padding(padding: EdgeInsets.all(40), child: Center(child: Column(children: [
         Icon(Icons.bolt, size: 48, color: C.text4), SizedBox(height: 12), Text('No AI usage data', style: TextStyle(color: C.text4)),

@@ -82,31 +82,37 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       body: SafeArea(child: RefreshIndicator(color: C.teal, onRefresh: _load, child: CustomScrollView(slivers: [
         // Header
-        SliverToBoxAdapter(child: Padding(padding: EdgeInsets.fromLTRB(20, 20, 20, 8), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(l.t('classes'), style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
-          SizedBox(height: 4),
-          Text(l.t('classes_sub'), style: TextStyle(fontSize: 13, color: C.text4, fontStyle: FontStyle.italic)),
-          SizedBox(height: 14),
-          Row(children: [
-            if (auth.isTeacher) ...[
-              Expanded(child: OutlinedButton.icon(icon: Icon(Icons.add, size: 16), label: Text(l.t('create_class')),
-                onPressed: () => _showCreateClass(),
-                style: OutlinedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14)))),
-              SizedBox(width: 10),
-            ],
-            Expanded(child: ElevatedButton.icon(icon: Icon(Icons.vpn_key_rounded, size: 16, color: Colors.white), label: Text(l.t('join_code')),
-              onPressed: _showJoinDialog,
-              style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14)))),
-          ]),
+        SliverToBoxAdapter(child: Padding(padding: EdgeInsets.fromLTRB(20, 20, 20, 16), child: Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(l.t('classes'), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: C.teal)),
+            Text(l.t('classes_sub'), style: TextStyle(fontSize: 13, color: C.text4)),
+          ])),
+          if (auth.isTeacher)
+            GestureDetector(onTap: () => _showCreateClass(),
+              child: Container(padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(color: C.teal, borderRadius: BorderRadius.circular(14),
+                  boxShadow: [BoxShadow(color: C.teal.withOpacity(0.35), blurRadius: 10, offset: Offset(0, 4))]),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.add, color: Colors.white, size: 18), SizedBox(width: 6), Text(l.t('create_class'), style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13))])))
+          else
+            GestureDetector(onTap: _showJoinDialog,
+              child: Container(padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(color: C.teal, borderRadius: BorderRadius.circular(14),
+                  boxShadow: [BoxShadow(color: C.teal.withOpacity(0.35), blurRadius: 10, offset: Offset(0, 4))]),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.vpn_key_rounded, color: Colors.white, size: 16), SizedBox(width: 6), Text(l.t('join_code'), style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13))]))),
         ]))),
 
         // Class cards
-        if (_loading) SliverFillRemaining(child: Center(child: CircularProgressIndicator(color: C.teal)))
+        if (_loading) SliverFillRemaining(child: Center(child: CircularProgressIndicator(color: C.teal, strokeWidth: 2.5)))
         else if (_classes.isEmpty) SliverFillRemaining(child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(width: 72, height: 72, decoration: BoxDecoration(color: adaptiveTealLt(context), borderRadius: BorderRadius.circular(20)), child: Icon(Icons.menu_book_rounded, color: C.teal, size: 32)),
-          SizedBox(height: 16), Text('No classes yet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: C.text3)),
-          SizedBox(height: 8), Text('Enter the code from your teacher', style: TextStyle(fontSize: 14, color: C.text4)),
-          SizedBox(height: 16), ElevatedButton.icon(icon: Icon(Icons.vpn_key_rounded, size: 16, color: Colors.white), label: Text('Join by Code'), onPressed: _showJoinDialog),
+          Container(width: 80, height: 80, decoration: BoxDecoration(gradient: LinearGradient(colors: [C.teal.withOpacity(0.15), C.teal.withOpacity(0.05)]), shape: BoxShape.circle),
+            child: Icon(Icons.menu_book_rounded, color: C.teal, size: 36)),
+          SizedBox(height: 20), Text('Нет классов', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: adaptiveText1(context))),
+          SizedBox(height: 6), Text('Введите код от преподавателя', style: TextStyle(fontSize: 14, color: C.text4)),
+          SizedBox(height: 20), GestureDetector(onTap: _showJoinDialog,
+            child: Container(padding: EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              decoration: BoxDecoration(color: C.teal, borderRadius: BorderRadius.circular(16),
+                boxShadow: [BoxShadow(color: C.teal.withOpacity(0.4), blurRadius: 12, offset: Offset(0, 4))]),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.vpn_key_rounded, color: Colors.white, size: 18), SizedBox(width: 8), Text('Войти по коду', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15))]))),
         ])))
         else SliverPadding(padding: EdgeInsets.fromLTRB(16, 8, 16, 0), sliver: SliverList(delegate: SliverChildBuilderDelegate((ctx, i) {
           final cls = _classes[i];

@@ -75,12 +75,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
             // Language
             Text(l.t('language'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: text1)),
             SizedBox(height: 8),
-            Container(decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(14)),
-              child: Row(children: ['RU', 'KZ', 'EN'].map((lang) => Expanded(child: GestureDetector(
-                onTap: () => l.setLang(lang),
-                child: Container(padding: EdgeInsets.symmetric(vertical: 12), decoration: BoxDecoration(color: l.lang == lang ? C.teal : Colors.transparent, borderRadius: BorderRadius.circular(12)),
-                  child: Center(child: Text(lang, style: TextStyle(fontWeight: FontWeight.w700, color: l.lang == lang ? Colors.white : C.text4)))),
-              ))).toList())),
+            Container(padding: EdgeInsets.all(4), decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(16)),
+              child: Row(children: [
+                {'code': 'RU', 'label': 'Русский', 'flag': '🇷🇺'},
+                {'code': 'KZ', 'label': 'Қазақша', 'flag': '🇰🇿'},
+                {'code': 'EN', 'label': 'English', 'flag': '🇬🇧'},
+              ].map((lang) {
+                final sel = l.lang == lang['code'];
+                return Expanded(child: GestureDetector(
+                  onTap: () => l.setLang(lang['code']!),
+                  child: AnimatedContainer(duration: Duration(milliseconds: 200), padding: EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(color: sel ? C.teal : Colors.transparent, borderRadius: BorderRadius.circular(12),
+                      boxShadow: sel ? [BoxShadow(color: C.teal.withOpacity(0.3), blurRadius: 8)] : null),
+                    child: Column(children: [
+                      Text(lang['code']!, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: sel ? Colors.white : C.text4)),
+                      SizedBox(height: 2),
+                      Text(lang['label']!, style: TextStyle(fontSize: 9, color: sel ? Colors.white70 : C.text4)),
+                    ]))));
+              }).toList())),
           ])),
         SizedBox(height: 16),
 
