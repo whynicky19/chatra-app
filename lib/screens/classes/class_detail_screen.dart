@@ -77,28 +77,32 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
     return Scaffold(
       body: NestedScrollView(
         headerSliverBuilder: (ctx, _) => [
-          SliverAppBar(expandedHeight: 200, pinned: true, backgroundColor: C.teal,
-            leading: IconButton(icon: Icon(Icons.arrow_back, color: Colors.white), onPressed: () => Navigator.pop(context)),
+          SliverAppBar(expandedHeight: 220, pinned: true, stretch: true,
+            backgroundColor: isDark ? Color(0xFF0A1214) : Color(0xFF004D5A),
+            leading: IconButton(icon: Container(width: 34, height: 34, decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(10)), child: Icon(Icons.arrow_back, color: Colors.white, size: 20)), onPressed: () => Navigator.pop(context)),
             actions: [
-              IconButton(icon: Icon(Icons.copy, color: Colors.white70, size: 20), onPressed: () {
+              IconButton(icon: Container(width: 34, height: 34, decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(10)), child: Icon(Icons.copy, color: Colors.white70, size: 18)), onPressed: () {
                 final code = _code(widget.classId);
                 Clipboard.setData(ClipboardData(text: code));
                 showToast(context, 'Код: $code');
               }),
-              if (auth.isTeacher) IconButton(icon: Icon(Icons.edit, color: Colors.white70, size: 20), onPressed: () => _editClass()),
+              if (auth.isTeacher) IconButton(icon: Container(width: 34, height: 34, decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(10)), child: Icon(Icons.edit, color: Colors.white70, size: 18)), onPressed: () => _editClass()),
             ],
             flexibleSpace: FlexibleSpaceBar(
+              collapseMode: CollapseMode.pin,
+              stretchModes: [StretchMode.zoomBackground],
+              title: Text(_title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white, shadows: [Shadow(color: Colors.black54, blurRadius: 4)]), maxLines: 1, overflow: TextOverflow.ellipsis),
+              titlePadding: EdgeInsets.only(left: 56, right: 56, bottom: 14),
               background: Stack(fit: StackFit.expand, children: [
-                if (coverImg == null) Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF006475), C.teal]))),
+                if (coverImg == null) Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF006475), C.teal], begin: Alignment.topLeft, end: Alignment.bottomRight))),
                 if (coverImg != null && !coverImg.toString().startsWith('data:'))
-                  Image.network(coverImg, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: C.teal)),
+                  Image.network(coverImg, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF006475), C.teal])))),
                 if (coverImg != null && coverImg.toString().startsWith('data:'))
                   Builder(builder: (_) { try { return Image.memory(base64Decode(coverImg.toString().split(',').last), fit: BoxFit.cover); } catch (_) { return Container(color: C.teal); } }),
-                Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black26, Colors.black54]))),
+                Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, stops: [0.0, 0.4, 1.0], colors: [Colors.black38, Colors.transparent, Colors.black54]))),
                 Positioned(bottom: 50, left: 16, right: 16, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(_title, style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)),
                   if (meta['description'] != null && meta['description'].toString().isNotEmpty)
-                    Padding(padding: EdgeInsets.only(top: 4), child: Text(meta['description'], style: TextStyle(color: Colors.white70, fontSize: 13))),
+                    Text(meta['description'], style: TextStyle(color: Colors.white70, fontSize: 13)),
                   SizedBox(height: 8),
                   GestureDetector(onTap: () { Clipboard.setData(ClipboardData(text: _code(widget.classId))); showToast(context, 'Код скопирован'); },
                     child: Container(padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6), decoration: BoxDecoration(color: adaptiveTealLt(context).withOpacity(0.9), borderRadius: BorderRadius.circular(8)),
