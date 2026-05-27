@@ -36,8 +36,8 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final surface = Theme.of(context).colorScheme.surface;
     return Scaffold(
-      body: SafeArea(child: Center(child: SingleChildScrollView(
-        padding: EdgeInsets.all(24),
+      body: SafeArea(child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(24, 48, 24, 24),
         child: Container(
           constraints: BoxConstraints(maxWidth: 420),
           padding: EdgeInsets.all(28),
@@ -79,7 +79,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ]),
           ]),
         ),
-      ))),
+      )),
     );
   }
 

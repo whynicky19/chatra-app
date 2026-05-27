@@ -253,8 +253,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
         return Dialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-          insetPadding: EdgeInsets.symmetric(horizontal: 24),
-          child: Padding(
+          insetPadding: EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          child: SingleChildScrollView(
             padding: EdgeInsets.all(28),
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               // Close button
@@ -293,6 +293,39 @@ class _HomeScreenState extends State<HomeScreen> {
                     onChanged: (val) => onKey(i, val),
                     onTap: () => controllers[i].selection = TextSelection(baseOffset: 0, extentOffset: controllers[i].text.length),
                   )))),
+
+              // ── Class preview (shows when code matches) ──
+              Builder(builder: (_) {
+                final code = get6Code();
+                if (code.length < 6) return SizedBox.shrink();
+                final found = _allClasses.where((c) => _code(c['id']) == code).toList();
+                if (found.isEmpty) return Padding(padding: EdgeInsets.only(top: 16),
+                  child: Container(padding: EdgeInsets.all(12), decoration: BoxDecoration(color: C.redLt, borderRadius: BorderRadius.circular(12)),
+                    child: Row(children: [Icon(Icons.error_outline, size: 16, color: C.red), SizedBox(width: 8),
+                      Text('Класс не найден', style: TextStyle(fontSize: 13, color: C.red, fontWeight: FontWeight.w500))])));
+                final cls = found.first;
+                final coverImg = cls['cover_image'];
+                final teacherName = cls['teacher_name'] ?? '';
+                return Padding(padding: EdgeInsets.only(top: 16),
+                  child: Container(
+                    decoration: BoxDecoration(color: adaptiveSurface2(context), borderRadius: BorderRadius.circular(16), border: Border.all(color: C.teal.withOpacity(0.2))),
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      // Cover
+                      SizedBox(height: 80, width: double.infinity,
+                        child: coverImg != null && coverImg.toString().startsWith('data:')
+                            ? Builder(builder: (_) { try { return Image.memory(base64Decode(coverImg.toString().split(',').last), fit: BoxFit.cover, width: double.infinity); } catch (_) { return Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF006475), C.teal]))); } })
+                            : coverImg != null
+                                ? Image.network(coverImg, fit: BoxFit.cover, width: double.infinity, errorBuilder: (_, __, ___) => Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF006475), C.teal]))))
+                                : Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF006475), C.teal])))),
+                      Padding(padding: EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(cls['title'] ?? '', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        if (teacherName.isNotEmpty) Padding(padding: EdgeInsets.only(top: 2),
+                          child: Text(teacherName, style: TextStyle(fontSize: 13, color: C.teal))),
+                      ])),
+                    ])));
+              }),
+
               SizedBox(height: 24),
               Divider(height: 1),
               SizedBox(height: 20),

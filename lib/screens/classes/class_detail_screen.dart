@@ -320,41 +320,87 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
     final pct = (_rating['avg_percent'] ?? 0).round();
 
     return ListView(padding: EdgeInsets.fromLTRB(12, 12, 12, 90), children: [
-      // Rating card (students)
-      if (!auth.isTeacher && _rating.isNotEmpty) TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0.0, end: 1.0), duration: Duration(milliseconds: 400), curve: Curves.easeOutCubic,
-        builder: (_, t, __) => Transform.translate(offset: Offset(0, 20 * (1 - t)), child: Opacity(opacity: t, child: Container(
-          margin: EdgeInsets.only(bottom: 16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(colors: [Color(0xFF006475), C.teal, Color(0xFF00C9D4)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [BoxShadow(color: C.teal.withOpacity(0.4), blurRadius: 20, offset: Offset(0, 6))],
-          ),
-          padding: EdgeInsets.all(20),
-          child: Row(children: [
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Container(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
-                  child: Text('МОЙ РЕЙТИНГ', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1))),
-              ]),
-              SizedBox(height: 12),
+      // Rating + Next Deadline side by side (students)
+      if (!auth.isTeacher && _rating.isNotEmpty) Padding(
+        padding: EdgeInsets.only(bottom: 16),
+        child: IntrinsicHeight(child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          // Rating card
+          Expanded(child: Container(
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [Color(0xFF006475), C.teal], begin: Alignment.topLeft, end: Alignment.bottomRight),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('МОЙ РЕЙТИНГ', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1)),
+              SizedBox(height: 8),
               RichText(text: TextSpan(children: [
-                TextSpan(text: '$avg', style: TextStyle(color: Colors.white, fontSize: 44, fontWeight: FontWeight.w900, height: 1)),
-                TextSpan(text: ' /100', style: TextStyle(color: Colors.white60, fontSize: 16, fontWeight: FontWeight.w600)),
+                TextSpan(text: '$avg', style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900, height: 1)),
+                TextSpan(text: ' /100', style: TextStyle(color: Colors.white60, fontSize: 14, fontWeight: FontWeight.w600)),
               ])),
               SizedBox(height: 8),
-              ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(
+              ClipRRect(borderRadius: BorderRadius.circular(3), child: LinearProgressIndicator(
                 value: avg / 100, backgroundColor: Colors.white24, color: Colors.white, minHeight: 4)),
-              SizedBox(height: 6),
-              Text('Успеваемость: $pct%', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500)),
-            ])),
-            SizedBox(width: 16),
-            Container(width: 64, height: 64, decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), shape: BoxShape.circle),
-              child: Icon(avg >= 80 ? Icons.emoji_events_rounded : avg >= 60 ? Icons.star_rounded : Icons.trending_up_rounded,
-                color: Colors.white, size: 32)),
-          ]),
-        )))),
-      // Header
+              SizedBox(height: 4),
+              Text('Успеваемость: $pct%', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500)),
+            ]),
+          )),
+          SizedBox(width: 10),
+          // Next deadline card
+          Expanded(child: Builder(builder: (_) {
+            final now = DateTime.now();
+            final upcoming = _assignments.where((a) {
+              if (a['deadline'] == null) return false;
+              final dl = DateTime.tryParse(a['deadline']);
+              if (dl == null) return false;
+              final sub = _subFor(a['id']);
+              return dl.isAfter(now) && (sub == null || sub['status'] != 'graded');
+            }).toList();
+            upcoming.sort((a, b) => (a['deadline'] ?? '').compareTo(b['deadline'] ?? ''));
+            if (upcoming.isEmpty) return Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: adaptiveBorder(context))),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('СЛЕД. ДЕДЛАЙН', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: C.text4, letterSpacing: 1)),
+                SizedBox(height: 16),
+                Center(child: Icon(Icons.check_circle_outline, size: 32, color: C.green)),
+                SizedBox(height: 8),
+                Center(child: Text('Всё сдано!', style: TextStyle(fontSize: 13, color: C.green, fontWeight: FontWeight.w600))),
+              ]));
+            final next = upcoming.first;
+            final dl = DateTime.parse(next['deadline']);
+            final diff = dl.difference(now);
+            final days = diff.inDays;
+            final hours = diff.inHours % 24;
+            final months = ['ЯНВ','ФЕВ','МАР','АПР','МАЙ','ИЮН','ИЮЛ','АВГ','СЕН','ОКТ','НОЯ','ДЕК'];
+            final remaining = days > 0 ? '$days дн. $hours ч.' : '$hours ч. ${diff.inMinutes % 60} мин.';
+            return Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: adaptiveBorder(context))),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('СЛЕД. ДЕДЛАЙН', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: C.text4, letterSpacing: 1)),
+                SizedBox(height: 10),
+                Row(children: [
+                  Container(
+                    width: 48, height: 56,
+                    decoration: BoxDecoration(color: adaptiveTealLt(context), borderRadius: BorderRadius.circular(10)),
+                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Text(months[dl.month - 1], style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: C.teal, letterSpacing: 1)),
+                      Text('${dl.day}', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: C.teal, height: 1.1)),
+                    ]),
+                  ),
+                  SizedBox(width: 10),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(next['title'] ?? '', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    SizedBox(height: 2),
+                    Text('Осталось: $remaining', style: TextStyle(fontSize: 11, color: days <= 1 ? C.red : C.teal, fontWeight: FontWeight.w500)),
+                  ])),
+                ]),
+              ]),
+            );
+          })),
+        ])),
+      ),
       Row(children: [
         Text('Задания', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
         Spacer(),
