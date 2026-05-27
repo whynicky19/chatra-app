@@ -306,24 +306,11 @@ class _ChatsScreenState extends State<ChatsScreen> with SingleTickerProviderStat
             boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.2 : 0.06), blurRadius: 12, offset: Offset(0, -2))],
           ),
           child: Row(children: [
-            // Attachment buttons
-            GestureDetector(onTap: () async {
-              try {
-                final picker = ImagePicker();
-                final img = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1200, imageQuality: 85);
-                if (img != null) {
-                  // Upload and send as message
-                  try {
-                    final api = context.read<ApiService>();
-                    final result = await api.uploadFile(img.path, img.name);
-                    final url = result['url'] ?? result['file_url'] ?? '';
-                    if (url.isNotEmpty) { await api.sendMessage(_activeChatId!, url); _pollMessages(); }
-                  } catch (_) { showToast(context, 'Ошибка загрузки', error: true); }
-                }
-              } catch (_) {}
-            }, child: Container(width: 40, height: 40, margin: EdgeInsets.only(right: 6),
-              decoration: BoxDecoration(color: adaptiveSurface2(context), borderRadius: BorderRadius.circular(12)),
-              child: Icon(Icons.image_outlined, size: 20, color: C.teal))),
+            // Photo attachment: gallery + camera
+            GestureDetector(onTap: () => _showPhotoMenu(context, _activeChatId!, () => _pollMessages()),
+              child: Container(width: 40, height: 40, margin: EdgeInsets.only(right: 6),
+                decoration: BoxDecoration(color: adaptiveSurface2(context), borderRadius: BorderRadius.circular(12)),
+                child: Icon(Icons.add_rounded, size: 22, color: C.teal))),
             Expanded(child: Container(
               decoration: BoxDecoration(color: adaptiveSurface2(context), borderRadius: BorderRadius.circular(24)),
               child: TextField(
@@ -350,13 +337,73 @@ class _ChatsScreenState extends State<ChatsScreen> with SingleTickerProviderStat
     );
   }
 
+  void _showPhotoMenu(BuildContext context, int chatId, VoidCallback onDone) {
+    showModalBottomSheet(context: context, shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(child: Padding(padding: EdgeInsets.fromLTRB(20, 16, 20, 16),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 36, height: 4, decoration: BoxDecoration(color: C.text4.withOpacity(0.3), borderRadius: BorderRadius.circular(2))),
+          SizedBox(height: 20),
+          _photoOption(ctx, Icons.photo_library_rounded, 'Галерея', () async {
+            Navigator.pop(ctx);
+            final img = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1200, imageQuality: 85);
+            if (img != null) await _uploadAndSend(chatId, img, onDone);
+          }),
+          SizedBox(height: 8),
+          _photoOption(ctx, Icons.camera_alt_rounded, 'Камера', () async {
+            Navigator.pop(ctx);
+            final img = await ImagePicker().pickImage(source: ImageSource.camera, maxWidth: 1200, imageQuality: 85);
+            if (img != null) await _uploadAndSend(chatId, img, onDone);
+          }),
+        ]),
+      )),
+    );
+  }
+
+  Widget _photoOption(BuildContext ctx, IconData icon, String label, VoidCallback onTap) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(color: adaptiveSurface2(ctx), borderRadius: BorderRadius.circular(14)),
+      child: Row(children: [
+        Container(width: 40, height: 40, decoration: BoxDecoration(color: C.teal.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+          child: Icon(icon, size: 20, color: C.teal)),
+        SizedBox(width: 14),
+        Text(label, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        Spacer(),
+        Icon(Icons.chevron_right, size: 20, color: C.text4),
+      ]),
+    ),
+  );
+
+  Future<void> _uploadAndSend(int chatId, XFile img, VoidCallback onDone) async {
+    try {
+      final api = context.read<ApiService>();
+      final result = await api.uploadFile(img.path, img.name);
+      var url = result['url'] ?? result['file_url'] ?? result['path'] ?? '';
+      // Make sure URL is absolute
+      if (url.isNotEmpty && !url.startsWith('http')) {
+        url = '${api.baseUrl}${url.startsWith('/') ? '' : '/'}$url';
+      }
+      if (url.isNotEmpty) { await api.sendMessage(chatId, url); onDone(); }
+    } catch (e) { if (mounted) showToast(context, 'Ошибка загрузки: $e', error: true); }
+  }
+
   Widget _buildMessageContent(String content, bool isMe) {
+    // Fix localhost URLs to use the actual server
+    String fixedContent = content;
+    try {
+      final api = context.read<ApiService>();
+      fixedContent = content
+          .replaceAll(RegExp(r'https?://localhost:\d+'), api.baseUrl)
+          .replaceAll(RegExp(r'https?://127\.0\.0\.1:\d+'), api.baseUrl);
+    } catch (_) {}
+
     // Check for image URL in content
     final imgRegex = RegExp(r'https?://\S+\.(jpg|jpeg|png|gif|webp)', caseSensitive: false);
-    final imgMatch = imgRegex.firstMatch(content);
+    final imgMatch = imgRegex.firstMatch(fixedContent);
     if (imgMatch != null) {
       final url = imgMatch.group(0)!;
-      final textPart = content.replaceAll(RegExp(r'\[.*?\]\(.*?\)'), '').replaceAll(url, '').trim();
+      final textPart = fixedContent.replaceAll(RegExp(r'\[.*?\]\(.*?\)'), '').replaceAll(url, '').trim();
       return ClipRRect(borderRadius: BorderRadius.circular(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Image.network(url, fit: BoxFit.cover, width: double.infinity, height: 200,
           loadingBuilder: (_, child, progress) => progress == null ? child : Container(height: 200, color: adaptiveSurface2(context), child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: C.teal))),
@@ -367,11 +414,11 @@ class _ChatsScreenState extends State<ChatsScreen> with SingleTickerProviderStat
 
     // Check for any URL
     final urlRegex = RegExp(r'https?://\S+');
-    final urlMatch = urlRegex.firstMatch(content);
+    final urlMatch = urlRegex.firstMatch(fixedContent);
     if (urlMatch != null) {
       final url = urlMatch.group(0)!;
-      final before = content.substring(0, urlMatch.start).trim();
-      final after = content.substring(urlMatch.end).trim();
+      final before = fixedContent.substring(0, urlMatch.start).trim();
+      final after = fixedContent.substring(urlMatch.end).trim();
       return Padding(padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (before.isNotEmpty) Text(before, style: TextStyle(fontSize: 15, color: isMe ? Colors.white : null)),
         Container(margin: EdgeInsets.only(top: 6), padding: EdgeInsets.all(10),
@@ -383,6 +430,6 @@ class _ChatsScreenState extends State<ChatsScreen> with SingleTickerProviderStat
     }
 
     return Padding(padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Text(content, style: TextStyle(fontSize: 15, color: isMe ? Colors.white : null, height: 1.4)));
+      child: Text(fixedContent, style: TextStyle(fontSize: 15, color: isMe ? Colors.white : null, height: 1.4)));
   }
 }

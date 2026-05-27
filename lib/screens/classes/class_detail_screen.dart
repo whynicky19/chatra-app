@@ -24,6 +24,7 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
   List<dynamic> _mySubs = [];
   Map<String, dynamic> _rating = {};
   bool _loading = true, _loadingAsg = false;
+  Set<int> _expandedCriteria = {};
 
   @override
   void initState() { super.initState(); _tabCtrl = TabController(length: 4, vsync: this); _tabCtrl.addListener(() { if (_tabCtrl.index == 2 && _assignments.isEmpty) _loadAssignments(); }); _load(); }
@@ -284,7 +285,30 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
   List<String> _extractFiles(dynamic p) {
     final body = p['body'] ?? '';
     final matches = RegExp(r'https?://[^\s"<>]+\.(pdf|doc|docx|txt|png|jpg|jpeg|pptx?|xlsx?)', caseSensitive: false).allMatches(body);
-    return matches.map((m) => m.group(0)!).toList();
+    return matches.map((m) => _fixFileUrl(m.group(0)!)).toList();
+  }
+
+  /// Fix localhost/127.0.0.1 URLs to use the actual API base URL
+  String _fixFileUrl(String url) {
+    final api = context.read<ApiService>();
+    final base = api.baseUrl; // e.g. http://10.0.2.2:8000
+    return url
+        .replaceAll(RegExp(r'https?://localhost:\d+'), base)
+        .replaceAll(RegExp(r'https?://127\.0\.0\.1:\d+'), base);
+  }
+
+  /// Remove raw file URLs from content for cleaner display
+  String _cleanContent(String content) {
+    return content
+        .replaceAll(RegExp(r'https?://[^\s"<>]+\.(pdf|doc|docx|txt|png|jpg|jpeg|pptx?|xlsx?)', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+        .trim();
+  }
+
+  /// Extract file URLs from plain text
+  List<String> _extractFilesFromText(String text) {
+    final matches = RegExp(r'https?://[^\s"<>]+\.(pdf|doc|docx|txt|png|jpg|jpeg|pptx?|xlsx?)', caseSensitive: false).allMatches(text);
+    return matches.map((m) => _fixFileUrl(m.group(0)!)).toList();
   }
 
   // ── Assignments tab ──
@@ -435,20 +459,35 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
   void _showPost(dynamic p, String type) {
     String content = ''; try { final b = jsonDecode(p['body']); content = b['content'] ?? b['description'] ?? ''; } catch (_) { content = p['body'] ?? ''; }
     final files = _extractFiles(p);
+    final cleanText = _cleanContent(content);
     showModalBottomSheet(context: context, isScrollControlled: true, shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => DraggableScrollableSheet(expand: false, initialChildSize: 0.7, maxChildSize: 0.95, builder: (ctx, sc) => ListView(controller: sc, padding: EdgeInsets.all(20), children: [
         Center(child: Container(width: 40, height: 4, margin: EdgeInsets.only(bottom: 16), decoration: BoxDecoration(color: adaptiveBorder(context), borderRadius: BorderRadius.circular(2)))),
         Text(_clean(p['title'] ?? ''), style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
         SizedBox(height: 6), Text(_fmtDate(p['created_at'] ?? ''), style: TextStyle(fontSize: 12, color: C.text4)),
-        SizedBox(height: 16), Text(content, style: TextStyle(fontSize: 14, height: 1.7)),
-        if (files.isNotEmpty) ...[SizedBox(height: 16), Text('Файлы:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: C.text3)), SizedBox(height: 8),
-          ...files.map((f) => GestureDetector(
-            onTap: () async {
-              final uri = Uri.parse(f);
-              if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
-            },
-            child: Container(margin: EdgeInsets.only(bottom: 6), padding: EdgeInsets.all(12), decoration: BoxDecoration(color: adaptiveTealLt(context), borderRadius: BorderRadius.circular(10)),
-              child: Row(children: [Icon(Icons.attach_file, size: 16, color: C.teal), SizedBox(width: 8), Expanded(child: Text(Uri.parse(f).pathSegments.last, style: TextStyle(fontSize: 13, color: C.teal, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)), Icon(Icons.open_in_new, size: 14, color: C.teal)])))),
+        if (cleanText.isNotEmpty) ...[SizedBox(height: 16), Text(cleanText, style: TextStyle(fontSize: 14, height: 1.7))],
+        if (files.isNotEmpty) ...[SizedBox(height: 16), Text('Прикреплённые файлы', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: C.text3)), SizedBox(height: 8),
+          ...files.map((f) {
+            final name = Uri.parse(f).pathSegments.last;
+            final ext = name.split('.').last.toLowerCase();
+            final icon = ext == 'pdf' ? Icons.picture_as_pdf : ext == 'pptx' || ext == 'ppt' ? Icons.slideshow : ext == 'doc' || ext == 'docx' ? Icons.description : ext == 'xlsx' || ext == 'xls' ? Icons.table_chart : Icons.insert_drive_file;
+            return GestureDetector(
+              onTap: () async {
+                final uri = Uri.parse(f);
+                try { await launchUrl(uri, mode: LaunchMode.inAppBrowserView); } catch (_) {}
+              },
+              child: Container(margin: EdgeInsets.only(bottom: 8), padding: EdgeInsets.all(14), decoration: BoxDecoration(color: adaptiveSurface2(context), borderRadius: BorderRadius.circular(12), border: Border.all(color: adaptiveBorder(context))),
+                child: Row(children: [
+                  Container(width: 40, height: 40, decoration: BoxDecoration(color: adaptiveTealLt(context), borderRadius: BorderRadius.circular(10)),
+                    child: Icon(icon, size: 20, color: C.teal)),
+                  SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(name, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
+                    Text(ext.toUpperCase(), style: TextStyle(fontSize: 11, color: C.text4)),
+                  ])),
+                  Icon(Icons.open_in_new_rounded, size: 16, color: C.teal),
+                ])));
+          }),
         ],
       ])));
   }
@@ -471,16 +510,62 @@ class _ClassDetailState extends State<ClassDetailScreen> with SingleTickerProvid
           _chip(Icons.star, '${a['max_score'] ?? 100} баллов', C.teal, adaptiveTealLt(context)),
           if (a['deadline'] != null) _chip(Icons.calendar_today, _fmtDate(a['deadline']), C.text4, adaptiveSurface2(context)),
         ]),
-        if (a['description'] != null) ...[SizedBox(height: 16), Text(a['description'], style: TextStyle(fontSize: 14, height: 1.6))],
-        // Criteria: only visible to teachers/admins
+        if (a['description'] != null) ...[
+          SizedBox(height: 16),
+          if (_cleanContent(a['description']).isNotEmpty)
+            Text(_cleanContent(a['description']), style: TextStyle(fontSize: 14, height: 1.6)),
+          // Show attached files from description
+          if (_extractFilesFromText(a['description']).isNotEmpty) ...[
+            SizedBox(height: 12),
+            ..._extractFilesFromText(a['description']).map((f) {
+              final name = Uri.parse(f).pathSegments.last;
+              final ext = name.split('.').last.toLowerCase();
+              final icon = ext == 'pdf' ? Icons.picture_as_pdf : ext == 'pptx' || ext == 'ppt' ? Icons.slideshow : ext == 'doc' || ext == 'docx' ? Icons.description : Icons.insert_drive_file;
+              return GestureDetector(
+                onTap: () async { final uri = Uri.parse(f); try { await launchUrl(uri, mode: LaunchMode.inAppBrowserView); } catch (_) {} },
+                child: Container(margin: EdgeInsets.only(bottom: 8), padding: EdgeInsets.all(12), decoration: BoxDecoration(color: adaptiveSurface2(context), borderRadius: BorderRadius.circular(12), border: Border.all(color: adaptiveBorder(context))),
+                  child: Row(children: [
+                    Container(width: 36, height: 36, decoration: BoxDecoration(color: adaptiveTealLt(context), borderRadius: BorderRadius.circular(10)), child: Icon(icon, size: 18, color: C.teal)),
+                    SizedBox(width: 10),
+                    Expanded(child: Text(name, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
+                    Icon(Icons.open_in_new_rounded, size: 14, color: C.teal),
+                  ])));
+            }),
+          ],
+        ],
+        // Criteria: collapsible for teachers/admins
         if (isTeacherOrAdmin && criteria.isNotEmpty) ...[
           SizedBox(height: 16),
-          Text('Критерии оценивания', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: C.text3)),
-          SizedBox(height: 8),
-          ...criteria.map((c) => Container(margin: EdgeInsets.only(bottom: 8), padding: EdgeInsets.all(12), decoration: BoxDecoration(color: adaptiveSurface2(context), borderRadius: BorderRadius.circular(10)),
-            child: Row(children: [Expanded(child: Text(c['name'] ?? '', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
-              Container(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: adaptiveTealLt(context), borderRadius: BorderRadius.circular(8)),
-                child: Text('${c['weight'] ?? 0}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: C.teal)))])))
+          GestureDetector(
+            onTap: () => setS(() { if (_expandedCriteria.contains(a['id'])) _expandedCriteria.remove(a['id']); else _expandedCriteria.add(a['id']); }),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(color: adaptiveTealLt(context), borderRadius: BorderRadius.circular(12)),
+              child: Row(children: [
+                Icon(Icons.rule_rounded, size: 16, color: C.teal),
+                SizedBox(width: 8),
+                Text('Критерии оценивания', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: C.teal)),
+                SizedBox(width: 4),
+                Text('(${criteria.length})', style: TextStyle(fontSize: 12, color: C.text4)),
+                Spacer(),
+                AnimatedRotation(turns: _expandedCriteria.contains(a['id']) ? 0.5 : 0.0, duration: Duration(milliseconds: 200),
+                  child: Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: C.teal)),
+              ]),
+            ),
+          ),
+          AnimatedSize(duration: Duration(milliseconds: 300), curve: Curves.easeInOut,
+            child: _expandedCriteria.contains(a['id']) ? Column(children: [
+              SizedBox(height: 8),
+              ...criteria.map((c) => Container(margin: EdgeInsets.only(bottom: 8), padding: EdgeInsets.all(12), decoration: BoxDecoration(color: adaptiveSurface2(context), borderRadius: BorderRadius.circular(10)),
+                child: Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(c['name'] ?? '', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  if (c['description'] != null && c['description'].toString().isNotEmpty)
+                    Padding(padding: EdgeInsets.only(top: 4), child: Text(c['description'], style: TextStyle(fontSize: 12, color: C.text4))),
+                ])),
+                  Container(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: adaptiveTealLt(context), borderRadius: BorderRadius.circular(8)),
+                    child: Text('${c['weight'] ?? 0}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: C.teal)))])))
+            ]) : SizedBox.shrink(),
+          ),
         ],
         // Grade result (students see their grade) — FULL FEEDBACK
         if (sub?['grade'] != null) ...[

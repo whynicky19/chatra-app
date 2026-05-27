@@ -43,8 +43,7 @@ class _LoginScreenState extends State<LoginScreen> {
           padding: EdgeInsets.all(28),
           decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(24)),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(width: 60, height: 60, decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), gradient: LinearGradient(colors: [C.teal, C.tealDk])),
-              child: Icon(Icons.school_rounded, color: Colors.white, size: 30)),
+            Image.asset('assets/logo.png', width: 180, height: 180),
             SizedBox(height: 20),
             Text('Добро пожаловать', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
             SizedBox(height: 4),

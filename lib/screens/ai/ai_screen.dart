@@ -27,10 +27,10 @@ class _AiScreenState extends State<AiScreen> with TickerProviderStateMixin {
   @override void dispose() { _pulseCtrl.dispose(); _fadeCtrl.dispose(); super.dispose(); }
 
   List<Map<String, dynamic>> _tips(L10n l) => [
-    {'icon': Icons.menu_book_rounded, 'text': l.t('tip_explain'), 'color': Color(0xFF0891B2)},
-    {'icon': Icons.key_rounded, 'text': l.t('tip_concepts'), 'color': Color(0xFF6366F1)},
-    {'icon': Icons.assignment_outlined, 'text': l.t('tip_help'), 'color': Color(0xFF059669)},
-    {'icon': Icons.error_outline, 'text': l.t('tip_mistakes'), 'color': Color(0xFFD97706)},
+    {'icon': Icons.menu_book_rounded, 'text': l.t('tip_explain')},
+    {'icon': Icons.lightbulb_outline_rounded, 'text': l.t('tip_concepts')},
+    {'icon': Icons.assignment_outlined, 'text': l.t('tip_help')},
+    {'icon': Icons.warning_amber_rounded, 'text': l.t('tip_mistakes')},
   ];
 
   void _send([String? override]) async {
@@ -145,22 +145,26 @@ class _AiScreenState extends State<AiScreen> with TickerProviderStateMixin {
       SizedBox(height: 8),
       Text(l.t('ask_ai'), style: TextStyle(fontSize: 15, color: C.teal, fontWeight: FontWeight.w500)),
       SizedBox(height: 32),
-      ...List.generate(2, (row) => Padding(padding: EdgeInsets.only(bottom: 10), child: Row(children: List.generate(2, (col) {
-        final i = row * 2 + col;
-        final t = tips[i];
-        return Expanded(child: Padding(padding: EdgeInsets.only(left: col == 1 ? 10 : 0),
-          child: GestureDetector(onTap: () => _send(t['text'] as String),
-            child: AnimatedContainer(duration: Duration(milliseconds: 200), padding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-              decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: (t['color'] as Color).withOpacity(0.15)),
-                boxShadow: [BoxShadow(color: (t['color'] as Color).withOpacity(0.06), blurRadius: 12, offset: Offset(0, 3))]),
-              child: Row(children: [
-                Container(width: 32, height: 32, decoration: BoxDecoration(color: (t['color'] as Color).withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-                  child: Icon(t['icon'] as IconData, size: 16, color: t['color'] as Color)),
-                SizedBox(width: 8),
-                Flexible(child: Text(t['text'] as String, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600), maxLines: 2)),
-              ])))));
-      })))),
+      ...tips.map((t) => Padding(padding: EdgeInsets.only(bottom: 10),
+        child: GestureDetector(onTap: () => _send(t['text'] as String),
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: C.teal.withOpacity(0.1)),
+            ),
+            child: Row(children: [
+              Container(width: 36, height: 36,
+                decoration: BoxDecoration(color: C.teal.withOpacity(0.08), borderRadius: BorderRadius.circular(10)),
+                child: Icon(t['icon'] as IconData, size: 18, color: C.teal)),
+              SizedBox(width: 12),
+              Expanded(child: Text(t['text'] as String, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
+              Icon(Icons.arrow_forward_ios, size: 14, color: C.text4),
+            ]),
+          ),
+        ),
+      )),
     ]))));
   }
 
